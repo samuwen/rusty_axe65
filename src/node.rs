@@ -1,12 +1,12 @@
-struct Node<T> {
+pub struct Node<T> {
   name: String,
   n_type: NodeType,
   data: Vec<T>,
-  children: Node<T>,
+  children: Vec<Node<T>>,
 }
 
 impl<T> Node<T> {
-  pub fn new(node_type: NodeType) -> Node<T> {
+  pub fn _new(node_type: NodeType) -> Node<T> {
     Node {
       name: String::from(""),
       n_type: node_type,
@@ -16,6 +16,6 @@ impl<T> Node<T> {
   }
 }
 
-enum NodeType {
+pub enum NodeType {
   Program,
 }
