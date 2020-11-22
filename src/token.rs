@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::fmt;
 
 pub struct Token {
@@ -8,10 +9,10 @@ pub struct Token {
 }
 
 impl Token {
-  pub fn new(val: &String, t: TokenType, start: usize, end: usize) -> Token {
+  pub fn new(val: String, t: &TokenType, start: usize, end: usize) -> Token {
     Token {
-      val: val.to_owned(),
-      t_type: t,
+      val: val,
+      t_type: t.clone(),
       start: start,
       end: end,
     }
@@ -28,7 +29,28 @@ impl fmt::Display for Token {
   }
 }
 
-#[derive(Debug)]
+impl PartialOrd for Token {
+  fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+    Some(self.cmp(other))
+  }
+}
+
+impl Ord for Token {
+  fn cmp(&self, other: &Self) -> Ordering {
+    self.start.cmp(&other.start)
+  }
+}
+
+impl Eq for Token {}
+
+impl PartialEq for Token {
+  fn eq(&self, other: &Self) -> bool {
+    self.start == other.start && self.val == other.val
+  }
+}
+
+#[derive(Clone, Debug)]
 pub enum TokenType {
-  Thingy,
+  Directive,
+  Identifier,
 }

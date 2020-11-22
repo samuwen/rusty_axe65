@@ -11,6 +11,7 @@ use log::*;
 use parser::parse;
 use std::fs::read_to_string;
 use std::time::{Duration, Instant};
+use token::Token;
 
 fn main() {
     Logger::with_env_or_str("debug")
@@ -20,7 +21,10 @@ fn main() {
         .unwrap();
     let parse_start = Instant::now();
     let file = read_to_string("src/data/test.s").expect("File not found");
-    lex_file(&file);
+    let _tokens = lex_file(&file);
+    for token in _tokens {
+        debug!("{}", token);
+    }
     parse();
     let parse_end = Instant::now();
     log_time("Parsing", parse_end - parse_start);
@@ -30,11 +34,12 @@ fn main() {
     log_time("Generation", generate_end - generate_start);
 }
 
-fn lex_file(file: &String) {
+fn lex_file(file: &String) -> Vec<Token> {
     let lex_start = Instant::now();
-    lex(file);
+    let tokens = lex(file);
     let lex_end = Instant::now();
     log_time("Lexing", lex_end - lex_start);
+    tokens
 }
 
 fn log_time(name: &str, dur: Duration) {
