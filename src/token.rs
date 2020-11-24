@@ -53,4 +53,9 @@ impl PartialEq for Token {
 pub enum TokenType {
   Directive,
   Identifier,
+  Label,
+  Number,
+  Comma,
+  XRegister,
+  YRegister,
 }

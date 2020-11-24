@@ -7,14 +7,27 @@ pub fn lex(file: &String) -> Vec<Token> {
   let mut out_vec = Vec::with_capacity(file.len());
   out_vec.append(&mut get_tokens_of_type(
     &file,
-    "(?<![a-zA-Z0-9])\\.[a-zA-Z]+",
+    "\\.[a-zA-Z]+",
     &TokenType::Directive,
   ));
   out_vec.append(&mut get_tokens_of_type(
     &file,
-    "(?<!\\$|#|%)[a-zA-Z\\.][a-zA-Z0-9_/:]+",
+    "(?<!\\$|#|%)[\"a-zA-Z\\.][a-zA-Z0-9_/:\"]+",
     &TokenType::Identifier,
   ));
+  out_vec.append(&mut get_tokens_of_type(
+    &file,
+    "[a-zA-Z]+:",
+    &TokenType::Label,
+  ));
+  out_vec.append(&mut get_tokens_of_type(
+    &file,
+    "(?<=[\\s,])#?\\$?%?[0-9a-fA-F]+(?=[^g-zG-z])",
+    &TokenType::Number,
+  ));
+  out_vec.append(&mut get_tokens_of_type(&file, ",", &TokenType::Comma));
+  out_vec.append(&mut get_tokens_of_type(&file, "X", &TokenType::XRegister));
+  out_vec.append(&mut get_tokens_of_type(&file, "Y", &TokenType::YRegister));
   out_vec.sort();
   out_vec
 }

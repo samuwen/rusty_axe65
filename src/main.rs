@@ -20,7 +20,7 @@ fn main() {
         .start()
         .unwrap();
     let parse_start = Instant::now();
-    let file = read_to_string("src/data/test.s").expect("File not found");
+    let file = read_to_string("src/data/build.s").expect("File not found");
     let _tokens = lex_file(&file);
     for token in _tokens {
         debug!("{}", token);
