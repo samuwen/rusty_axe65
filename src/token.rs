@@ -1,6 +1,7 @@
 use std::cmp::Ordering;
 use std::fmt;
 
+#[derive(Clone, Debug)]
 pub struct Token {
   val: String,
   t_type: TokenType,
@@ -16,6 +17,14 @@ impl Token {
       start: start,
       end: end,
     }
+  }
+
+  pub fn get_type(&self) -> &TokenType {
+    &self.t_type
+  }
+
+  pub fn get_value(&self) -> &String {
+    &self.val
   }
 }
 
@@ -49,7 +58,7 @@ impl PartialEq for Token {
   }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TokenType {
   Directive,
   Identifier,
@@ -58,4 +67,5 @@ pub enum TokenType {
   Comma,
   XRegister,
   YRegister,
+  EndOfFile,
 }

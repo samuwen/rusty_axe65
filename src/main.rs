@@ -1,6 +1,7 @@
 mod generator;
 mod lexer;
 mod node;
+mod opcode;
 mod parser;
 mod token;
 
@@ -9,7 +10,7 @@ use generator::generate;
 use lexer::lex;
 use log::*;
 use parser::parse;
-use std::fs::read_to_string;
+use std::fs::{read_to_string, write};
 use std::time::{Duration, Instant};
 use token::Token;
 
@@ -21,11 +22,8 @@ fn main() {
         .unwrap();
     let parse_start = Instant::now();
     let file = read_to_string("src/data/build.s").expect("File not found");
-    let _tokens = lex_file(&file);
-    for token in _tokens {
-        debug!("{}", token);
-    }
-    parse();
+    let tokens = lex_file(&file);
+    parse(tokens);
     let parse_end = Instant::now();
     log_time("Parsing", parse_end - parse_start);
     let generate_start = Instant::now();
@@ -39,6 +37,9 @@ fn lex_file(file: &String) -> Vec<Token> {
     let tokens = lex(file);
     let lex_end = Instant::now();
     log_time("Lexing", lex_end - lex_start);
+    let to_file = tokens.clone();
+    let out: Vec<String> = to_file.iter().map(|t| format!("{}", t)).collect();
+    write("src/out/lexed.out", out.join("\n")).unwrap();
     tokens
 }
 

@@ -1,3 +1,5 @@
+use std::fmt;
+
 pub struct Node<T> {
   name: String,
   n_type: NodeType,
@@ -6,16 +8,59 @@ pub struct Node<T> {
 }
 
 impl<T> Node<T> {
-  pub fn _new(node_type: NodeType) -> Node<T> {
+  pub fn new(name: &String, node_type: NodeType) -> Node<T> {
     Node {
-      name: String::from(""),
+      name: name.to_owned(),
       n_type: node_type,
       data: vec![],
       children: vec![],
     }
   }
+
+  pub fn add_child(&mut self, child: Node<T>) {
+    self.children.push(child)
+  }
+
+  pub fn add_data(&mut self, data: T) {
+    self.data.push(data)
+  }
+
+  pub fn get_data(&self) -> &Vec<T> {
+    &self.data
+  }
+
+  pub fn get_type(&self) -> &NodeType {
+    &self.n_type
+  }
 }
 
+impl Node<String> {
+  fn format_self(&self, count: usize) -> String {
+    let mut tabs = String::new();
+    for _ in 0..count {
+      tabs.push_str("  ");
+    }
+    let mut return_str = format!(
+      "{}type: {:?} | data: {} | children:\n",
+      tabs,
+      self.n_type,
+      self.data.join(", ")
+    );
+    for child in self.children.iter() {
+      return_str.push_str(&child.format_self(count + 1));
+    }
+    return_str
+  }
+}
+
+impl fmt::Display for Node<String> {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "{}", self.format_self(0))
+  }
+}
+
+#[derive(Debug)]
 pub enum NodeType {
   Program,
+  Opcode,
 }
