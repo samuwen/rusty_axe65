@@ -22,7 +22,7 @@ fn parse_opcode(tokens: &mut Vec<Token>) -> Node<String> {
   let token = get_next_token_checked(tokens, &TokenType::Identifier);
   match is_opcode(&token) {
     true => {
-      let op_node = Node::new(token.get_value(), NodeType::ImmediateOpcode);
+      let op_node = Node::new(token.get_value(), NodeType::ImpliedOpcode);
       op_node
     }
     false => panic!("Expected opcode, got {}", token.get_value()),

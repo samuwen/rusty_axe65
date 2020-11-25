@@ -1,3 +1,4 @@
+use crate::opcode::*;
 use std::fmt;
 
 #[derive(Clone, Debug)]
@@ -44,6 +45,14 @@ impl<T> Node<T> {
 }
 
 impl Node<String> {
+  pub fn get_opcode_value(&self) -> u8 {
+    match self.n_type {
+      NodeType::ImpliedOpcode => get_implied(&self.name),
+      NodeType::ImmediateOpcode => get_immediate(&self.name),
+      _ => panic!("Expected opcode, got {:?}", self.n_type),
+    }
+  }
+
   fn format_self(&self, count: usize) -> String {
     let mut tabs = String::new();
     for _ in 0..count {
@@ -72,5 +81,6 @@ impl fmt::Display for Node<String> {
 #[derive(Clone, Debug)]
 pub enum NodeType {
   Program,
+  ImpliedOpcode,
   ImmediateOpcode,
 }
