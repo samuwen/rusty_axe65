@@ -1,5 +1,6 @@
 use std::fmt;
 
+#[derive(Clone, Debug)]
 pub struct Node<T> {
   name: String,
   n_type: NodeType,
@@ -32,6 +33,14 @@ impl<T> Node<T> {
   pub fn get_type(&self) -> &NodeType {
     &self.n_type
   }
+
+  pub fn get_children(&self) -> &Vec<Node<T>> {
+    &self.children
+  }
+
+  pub fn get_name(&self) -> &String {
+    &self.name
+  }
 }
 
 impl Node<String> {
@@ -41,8 +50,9 @@ impl Node<String> {
       tabs.push_str("  ");
     }
     let mut return_str = format!(
-      "{}type: {:?} | data: {} | children:\n",
+      "{}name: {} | type: {:?} | data: {} | children:\n",
       tabs,
+      self.name,
       self.n_type,
       self.data.join(", ")
     );
@@ -59,8 +69,8 @@ impl fmt::Display for Node<String> {
   }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum NodeType {
   Program,
-  Opcode,
+  ImmediateOpcode,
 }
