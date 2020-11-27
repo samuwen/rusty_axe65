@@ -11,8 +11,7 @@ pub fn generate(tree: Node<String>) -> Vec<String> {
 }
 
 fn generate_opcode(opcode: &Node<String>, out_vec: &mut Vec<String>) {
-  let op_name = opcode.get_name();
-  let mut out_string = format!("{} ", op_name);
+  let mut out_string = String::new();
   for child in opcode.get_children() {
     for data in child.get_data() {
       out_string.push_str(data);

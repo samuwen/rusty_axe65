@@ -16,7 +16,11 @@ pub fn lex(file: &String) -> Vec<Token> {
   out_vec.push(next);
   out_vec
     .into_iter()
-    .filter(|t| t.get_type() != &TokenType::Whitespace && t.get_type() != &TokenType::Comment)
+    .filter(|t| {
+      t.get_type() != &TokenType::Whitespace
+        && t.get_type() != &TokenType::Comment
+        && t.get_type() != &TokenType::Newline
+    })
     .collect()
 }
 

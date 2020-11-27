@@ -3,25 +3,22 @@ use std::fmt;
 
 #[derive(Clone, Debug)]
 pub struct Node<T> {
-  name: String,
   n_type: NodeType,
   data: Vec<T>,
   children: Vec<Node<T>>,
 }
 
 impl<T> Node<T> {
-  pub fn new(name: &String, node_type: NodeType) -> Node<T> {
+  pub fn new(node_type: NodeType) -> Node<T> {
     Node {
-      name: name.to_owned(),
       n_type: node_type,
       data: vec![],
       children: vec![],
     }
   }
 
-  pub fn new_with_child(name: &String, node_type: NodeType, child: Node<T>) -> Node<T> {
+  pub fn new_with_child(node_type: NodeType, child: Node<T>) -> Node<T> {
     let mut node = Node {
-      name: name.to_owned(),
       n_type: node_type,
       data: vec![],
       children: vec![],
@@ -49,17 +46,11 @@ impl<T> Node<T> {
   pub fn get_children(&self) -> &Vec<Node<T>> {
     &self.children
   }
-
-  pub fn get_name(&self) -> &String {
-    &self.name
-  }
 }
 
 impl Node<String> {
   pub fn _get_opcode_value(&self) -> u8 {
     match self.n_type {
-      NodeType::ImpliedOpcode => _get_implied(&self.name),
-      NodeType::ImmediateOpcode => _get_immediate(&self.name),
       _ => panic!("Expected opcode, got {:?}", self.n_type),
     }
   }
@@ -70,9 +61,8 @@ impl Node<String> {
       tabs.push_str("  ");
     }
     let mut return_str = format!(
-      "{}name: {} | type: {:?} | data: {} | children:\n",
+      "{}type: {:?} | data: {} | children:\n",
       tabs,
-      self.name,
       self.n_type,
       self.data.join(", ")
     );
@@ -92,7 +82,5 @@ impl fmt::Display for Node<String> {
 #[derive(Clone, Debug)]
 pub enum NodeType {
   Program,
-  ImpliedOpcode,
-  ImmediateOpcode,
-  Number,
+  Assignment,
 }
