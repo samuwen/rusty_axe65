@@ -171,7 +171,6 @@ fn handle_operator(chars: &mut Characters) -> Token {
       ',' => handle_single_operator(current, TokenType::Comma, start, end),
       '~' => handle_single_operator(current, TokenType::Not, start, end),
       '!' => handle_single_operator(current, TokenType::BoolNot, start, end),
-      '"' => handle_single_operator(current, TokenType::StringConst, start, end),
       '<' => handle_single_operator(current, TokenType::LessThan, start, end),
       '>' => handle_single_operator(current, TokenType::GreaterThan, start, end),
       '(' => handle_single_operator(current, TokenType::OParen, start, end),
@@ -182,6 +181,7 @@ fn handle_operator(chars: &mut Characters) -> Token {
       '}' => handle_single_operator(current, TokenType::CCurly, start, end),
       '#' => handle_single_operator(current, TokenType::Hash, start, end),
       ':' => handle_single_operator(current, TokenType::Colon, start, end),
+      '"' => handle_string_constant(chars, start),
       _ => panic!("Unrecognized operator: {}", current),
     },
   }
@@ -237,6 +237,21 @@ fn handle_comment(chars: &mut Characters) -> Token {
     next = chars.peek_next();
   }
   Token::new(end, TokenType::Comment, start, chars.get_index())
+}
+
+fn handle_string_constant(chars: &mut Characters, s: usize) -> Token {
+  let mut next = chars.peek_next();
+  let mut out_string = String::new();
+  while next != '"' {
+    let c = chars.get_next();
+    out_string.push(c);
+    next = chars.peek_next();
+  }
+  let close_quote = chars.get_next();
+  if close_quote != '"' {
+    panic!("String constant quotes not closed");
+  }
+  Token::new(out_string, TokenType::StringConst, s, chars.get_index())
 }
 
 struct Characters {
