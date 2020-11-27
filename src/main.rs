@@ -1,3 +1,4 @@
+mod char_helper;
 mod generator;
 mod lexer;
 mod node;
@@ -23,8 +24,8 @@ fn main() {
         .unwrap();
     let file = read_to_string("src/data/build.s").expect("File not found");
     let tokens = lex_file(&file);
-    let tree = parse_file(tokens);
-    generate_file(tree);
+    // let tree = parse_file(tokens);
+    // generate_file(tree);
 }
 
 fn lex_file(file: &String) -> Vec<Token> {
@@ -54,7 +55,7 @@ fn generate_file(tree: Node<String>) {
     let generated = generate(tree);
     let generate_end = Instant::now();
     log_time("Generation", generate_end - generate_start);
-    write("src/out/generated.out", generated.join(" ")).unwrap();
+    write("src/out/generated.out", generated.join("\n")).unwrap();
 }
 
 fn log_time(name: &str, dur: Duration) {

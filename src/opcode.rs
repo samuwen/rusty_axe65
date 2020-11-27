@@ -1,8 +1,5 @@
-use crate::token::Token;
-
-pub fn is_opcode(t: &Token) -> bool {
-  let value = t.get_value().to_ascii_lowercase();
-  match value.as_ref() {
+pub fn is_opcode(t: &str) -> bool {
+  match t.to_ascii_lowercase().as_ref() {
     "adc" | "and" | "asl" | "bcc" | "bcs" | "beq" | "bit" | "bmi" | "bne" | "bpl" | "brk"
     | "bvc" | "bvs" | "clc" | "cld" | "cli" | "clv" | "cmp" | "cpx" | "cpy" | "dec" | "dex"
     | "dey" | "eor" | "inc" | "inx" | "iny" | "jmp" | "jsr" | "lda" | "ldx" | "ldy" | "lsr"

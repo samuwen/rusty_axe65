@@ -344,6 +344,7 @@ name = "rusty_axe65"
 version = "0.1.0"
 dependencies = [
  "flexi_logger",
+ "lazy_static",
  "log",
  "onig",
 ]

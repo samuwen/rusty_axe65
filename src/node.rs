@@ -19,6 +19,17 @@ impl<T> Node<T> {
     }
   }
 
+  pub fn new_with_child(name: &String, node_type: NodeType, child: Node<T>) -> Node<T> {
+    let mut node = Node {
+      name: name.to_owned(),
+      n_type: node_type,
+      data: vec![],
+      children: vec![],
+    };
+    node.add_child(child);
+    node
+  }
+
   pub fn add_child(&mut self, child: Node<T>) {
     self.children.push(child)
   }
@@ -83,4 +94,6 @@ pub enum NodeType {
   Program,
   ImpliedOpcode,
   ImmediateOpcode,
+  Number,
+  Untyped,
 }
