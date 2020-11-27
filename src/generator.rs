@@ -1,4 +1,4 @@
-use crate::node::{Node, NodeType};
+use crate::node::Node;
 use log::*;
 
 pub fn generate(tree: Node<String>) -> Vec<String> {

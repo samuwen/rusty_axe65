@@ -24,8 +24,8 @@ fn main() {
         .unwrap();
     let file = read_to_string("src/data/build.s").expect("File not found");
     let tokens = lex_file(&file);
-    // let tree = parse_file(tokens);
-    // generate_file(tree);
+    let tree = parse_file(tokens);
+    generate_file(tree);
 }
 
 fn lex_file(file: &String) -> Vec<Token> {

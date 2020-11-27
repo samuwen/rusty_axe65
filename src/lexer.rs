@@ -283,10 +283,6 @@ impl Characters {
     self.chars[self.cur_index - 1]
   }
 
-  fn get_previous(&self) -> char {
-    self.chars[self.cur_index - 2]
-  }
-
   fn peek_next(&mut self) -> char {
     self.chars[self.cur_index]
   }

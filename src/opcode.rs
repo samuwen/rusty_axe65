@@ -11,7 +11,7 @@ pub fn is_opcode(t: &str) -> bool {
 }
 
 // Also includes accumulator
-pub fn get_implied(code: &str) -> u8 {
+pub fn _get_implied(code: &str) -> u8 {
   match code.to_ascii_lowercase().as_str() {
     "asl" => 0x0A,
     "brk" => 0x00,
@@ -46,7 +46,7 @@ pub fn get_implied(code: &str) -> u8 {
   }
 }
 
-pub fn get_immediate(code: &str) -> u8 {
+pub fn _get_immediate(code: &str) -> u8 {
   match code.to_ascii_lowercase().as_str() {
     "adc" => 0x69,
     "and" => 0x29,

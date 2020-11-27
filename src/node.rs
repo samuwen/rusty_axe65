@@ -42,7 +42,7 @@ impl<T> Node<T> {
     &self.data
   }
 
-  pub fn get_type(&self) -> &NodeType {
+  pub fn _get_type(&self) -> &NodeType {
     &self.n_type
   }
 
@@ -56,10 +56,10 @@ impl<T> Node<T> {
 }
 
 impl Node<String> {
-  pub fn get_opcode_value(&self) -> u8 {
+  pub fn _get_opcode_value(&self) -> u8 {
     match self.n_type {
-      NodeType::ImpliedOpcode => get_implied(&self.name),
-      NodeType::ImmediateOpcode => get_immediate(&self.name),
+      NodeType::ImpliedOpcode => _get_implied(&self.name),
+      NodeType::ImmediateOpcode => _get_immediate(&self.name),
       _ => panic!("Expected opcode, got {:?}", self.n_type),
     }
   }
@@ -95,5 +95,4 @@ pub enum NodeType {
   ImpliedOpcode,
   ImmediateOpcode,
   Number,
-  Untyped,
 }

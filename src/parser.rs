@@ -1,7 +1,6 @@
 use crate::node::{Node, NodeType};
 use crate::opcode::is_opcode;
 use crate::token::{Token, TokenType};
-use log::*;
 
 // [[label[:]] [(opcode|directive|macro) [arguments]]] [; comment]
 

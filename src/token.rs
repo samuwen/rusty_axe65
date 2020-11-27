@@ -27,11 +27,11 @@ impl Token {
     &self.val
   }
 
-  pub fn get_start(&self) -> &usize {
+  pub fn _get_start(&self) -> &usize {
     &self.start
   }
 
-  pub fn get_end(&self) -> &usize {
+  pub fn _get_end(&self) -> &usize {
     &self.end
   }
 }
