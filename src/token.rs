@@ -34,14 +34,43 @@ impl Token {
   pub fn _get_end(&self) -> &usize {
     &self.end
   }
+
+  fn get_type_padding(&self) -> String {
+    let max_len = 25;
+    let my_len = format!("{:?}", self.t_type).len();
+    self.get_padding(max_len - my_len)
+  }
+
+  fn get_text_padding(&self) -> String {
+    let max_len = 25;
+    let my_len = format!("{:?}", self.val).len();
+    self.get_padding(max_len - my_len)
+  }
+
+  fn get_start_padding(&self) -> String {
+    let max_len = 6;
+    let my_len = format!("{:?}", self.start).len();
+    self.get_padding(max_len - my_len)
+  }
+
+  fn get_padding(&self, len: usize) -> String {
+    let mut padding = String::new();
+    for _ in 0..len {
+      padding.push(' ');
+    }
+    padding
+  }
 }
 
 impl fmt::Display for Token {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    let type_padding = self.get_type_padding();
+    let text_padding = self.get_text_padding();
+    let start_padding = self.get_start_padding();
     write!(
       f,
-      "type: {:?}, text: {}, start: {}, end: {}",
-      self.t_type, self.val, self.start, self.end
+      "type:\t{:?},{}text:\t{},{}start:\t{},{}end:\t{}",
+      self.t_type, type_padding, self.val, text_padding, self.start, start_padding, self.end
     )
   }
 }
