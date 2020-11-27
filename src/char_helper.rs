@@ -26,6 +26,35 @@ pub fn is_local_label_signifier(c: char) -> bool {
   c == '@'
 }
 
+pub fn is_operator(c: char) -> bool {
+  match c {
+    '+' | '-' | '/' | '*' | '^' | '&' | '|' | ':' | '=' | ',' | ';' | '#' | '(' | ')' | '['
+    | ']' | '{' | '}' | '<' | '>' | '!' | '~' | '"' | '\\' => true,
+    _ => false,
+  }
+}
+
+pub fn is_combo_operator(c: char) -> bool {
+  match c {
+    '<' | '>' | ':' => true,
+    _ => false,
+  }
+}
+
+pub fn is_whitespace(c: char) -> bool {
+  match c {
+    ' ' | '\t' => true,
+    _ => false,
+  }
+}
+
+pub fn is_newline(c: char) -> bool {
+  match c {
+    '\n' | '\r' => true,
+    _ => false,
+  }
+}
+
 pub fn is_hex_number(c: char) -> bool {
   c.is_digit(16)
 }
