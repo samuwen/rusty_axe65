@@ -44,10 +44,13 @@ fn parse_assignment(tokens: &mut Vec<Token>) -> Node<String> {
 // <directive> ::= <dir-segment> | <dir-other>
 fn parse_directive(tokens: &mut Vec<Token>) -> Node<String> {
   let directive = get_next_token(tokens);
-  match directive.get_type() {
+  let mut dir_statement = Node::new(NodeType::DirectiveStatement);
+  let child = match directive.get_type() {
     TokenType::DirectiveSegment => parse_dir_segment(tokens, directive),
     _ => parse_dir_other(tokens),
-  }
+  };
+  dir_statement.add_child(child);
+  dir_statement
 }
 
 // <dir-segment> ::= ".segment" <dir-seg-name>
@@ -114,8 +117,42 @@ fn parse_dir_value(tokens: &mut Vec<Token>) -> Node<String> {
   string
 }
 
+// <label> ::= <normal-label> | <local-label> | <unnamed-label>
 fn parse_label(tokens: &mut Vec<Token>) -> Node<String> {
-  todo!();
+  let mut label_statement = Node::new(NodeType::LabelStatement);
+  let next = peek_next_token(tokens);
+  let child = match next.get_type() {
+    TokenType::Identifier => parse_normal_label(tokens),
+    TokenType::LocalLabel => parse_local_label(tokens),
+    _ => parse_unnamed_label(tokens),
+  };
+  label_statement.add_child(child);
+  label_statement
+}
+
+// <normal-label> ::= <id> ":"
+fn parse_normal_label(tokens: &mut Vec<Token>) -> Node<String> {
+  let mut normal_label = Node::new(NodeType::Label);
+  let id = get_next_token_checked(tokens, vec![TokenType::Identifier]);
+  get_next_token_checked(tokens, vec![TokenType::Colon]);
+  normal_label.add_data(id.get_value());
+  normal_label
+}
+
+// <local-label> ::= "@" <id> ":"
+fn parse_local_label(tokens: &mut Vec<Token>) -> Node<String> {
+  let mut local_label = Node::new(NodeType::LocalLabel);
+  let id = get_next_token_checked(tokens, vec![TokenType::Identifier]);
+  get_next_token_checked(tokens, vec![TokenType::Colon]);
+  local_label.add_data(id.get_value());
+  local_label
+}
+
+// <unnamed-label> ::= ":"
+fn parse_unnamed_label(tokens: &mut Vec<Token>) -> Node<String> {
+  let unnamed = Node::new(NodeType::LocalLabel);
+  get_next_token_checked(tokens, vec![TokenType::Colon]);
+  unnamed
 }
 
 fn parse_opcode(tokens: &mut Vec<Token>) -> Node<String> {

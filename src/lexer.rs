@@ -105,7 +105,6 @@ fn handle_local_label(chars: &mut Characters) -> Token {
   if period != '@' {
     panic!("Expected '@' got {}", period);
   }
-  chars.get_next();
   let token_string = get_identifier_text(chars);
   Token::new(
     token_string,
