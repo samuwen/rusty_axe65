@@ -60,6 +60,10 @@ impl Token {
     }
     padding
   }
+
+  pub fn is_terminus(&self) -> bool {
+    self.get_type() == &TokenType::EndOfFile || self.get_type() == &TokenType::Newline
+  }
 }
 
 impl fmt::Display for Token {
