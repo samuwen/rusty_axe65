@@ -98,7 +98,6 @@ impl PartialEq for Token {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TokenType {
   Identifier,
-  Number,
   HexNumber,
   BinNumber,
   DecNumber,
@@ -301,6 +300,7 @@ pub enum TokenType {
   Newline,
   Namespace,
   ULabel,
+  Opcode,
   EndOfFile,
 }
 
@@ -472,6 +472,176 @@ impl TokenType {
       "xor" => TokenType::DirectiveXor,
       "zeropage" => TokenType::DirectiveZeropage,
       _ => panic!("{} is not a directive", identifier),
+    }
+  }
+
+  pub fn is_directive(&self) -> bool {
+    match self {
+      TokenType::DirectiveA16
+      | TokenType::DirectiveA8
+      | TokenType::DirectiveAddr
+      | TokenType::DirectiveAddrsize
+      | TokenType::DirectiveAlign
+      | TokenType::DirectiveAnd
+      | TokenType::DirectiveAsciiz
+      | TokenType::DirectiveAsize
+      | TokenType::DirectiveAssert
+      | TokenType::DirectiveAutoimport
+      | TokenType::DirectiveBank
+      | TokenType::DirectiveBankbyte
+      | TokenType::DirectiveBankbytes
+      | TokenType::DirectiveBitand
+      | TokenType::DirectiveBitnot
+      | TokenType::DirectiveBitor
+      | TokenType::DirectiveBitxor
+      | TokenType::DirectiveBlank
+      | TokenType::DirectiveBss
+      | TokenType::DirectiveByt
+      | TokenType::DirectiveByte
+      | TokenType::DirectiveCase
+      | TokenType::DirectiveCharmap
+      | TokenType::DirectiveCode
+      | TokenType::DirectiveConcat
+      | TokenType::DirectiveCondes
+      | TokenType::DirectiveConst
+      | TokenType::DirectiveConstructor
+      | TokenType::DirectiveCpu
+      | TokenType::DirectiveData
+      | TokenType::DirectiveDbg
+      | TokenType::DirectiveDbyt
+      | TokenType::DirectiveDebuginfo
+      | TokenType::DirectiveDef
+      | TokenType::DirectiveDefine
+      | TokenType::DirectiveDefined
+      | TokenType::DirectiveDefinedmacro
+      | TokenType::DirectiveDelmac
+      | TokenType::DirectiveDelmacro
+      | TokenType::DirectiveDestructor
+      | TokenType::DirectiveDword
+      | TokenType::DirectiveElse
+      | TokenType::DirectiveElseif
+      | TokenType::DirectiveEnd
+      | TokenType::DirectiveEndenum
+      | TokenType::DirectiveEndif
+      | TokenType::DirectiveEndmac
+      | TokenType::DirectiveEndmacro
+      | TokenType::DirectiveEndproc
+      | TokenType::DirectiveEndrep
+      | TokenType::DirectiveEndrepeat
+      | TokenType::DirectiveEndscope
+      | TokenType::DirectiveEndstruct
+      | TokenType::DirectiveEndunion
+      | TokenType::DirectiveEnum
+      | TokenType::DirectiveError
+      | TokenType::DirectiveExitmac
+      | TokenType::DirectiveExitmacro
+      | TokenType::DirectiveExport
+      | TokenType::DirectiveExportzp
+      | TokenType::DirectiveFaraddr
+      | TokenType::DirectiveFatal
+      | TokenType::DirectiveFeature
+      | TokenType::DirectiveFileopt
+      | TokenType::DirectiveFopt
+      | TokenType::DirectiveForceimport
+      | TokenType::DirectiveForceword
+      | TokenType::DirectiveGlobal
+      | TokenType::DirectiveGlobalzp
+      | TokenType::DirectiveHibyte
+      | TokenType::DirectiveHibytes
+      | TokenType::DirectiveHiword
+      | TokenType::DirectiveI16
+      | TokenType::DirectiveI8
+      | TokenType::DirectiveIdent
+      | TokenType::DirectiveIf
+      | TokenType::DirectiveIfblank
+      | TokenType::DirectiveIfconst
+      | TokenType::DirectiveIfdef
+      | TokenType::DirectiveIfnblank
+      | TokenType::DirectiveIfnconst
+      | TokenType::DirectiveIfndef
+      | TokenType::DirectiveIfnref
+      | TokenType::DirectiveIfp02
+      | TokenType::DirectiveIfp4510
+      | TokenType::DirectiveIfp816
+      | TokenType::DirectiveIfpc02
+      | TokenType::DirectiveIfpsc02
+      | TokenType::DirectiveIfref
+      | TokenType::DirectiveImport
+      | TokenType::DirectiveImportzp
+      | TokenType::DirectiveIncbin
+      | TokenType::DirectiveInclude
+      | TokenType::DirectiveInterruptor
+      | TokenType::DirectiveIsize
+      | TokenType::DirectiveIsmnem
+      | TokenType::DirectiveIsmnemonic
+      | TokenType::DirectiveLeft
+      | TokenType::DirectiveLinecont
+      | TokenType::DirectiveList
+      | TokenType::DirectiveListbytes
+      | TokenType::DirectiveLobyte
+      | TokenType::DirectiveLobytes
+      | TokenType::DirectiveLocal
+      | TokenType::DirectiveLocalchar
+      | TokenType::DirectiveLoword
+      | TokenType::DirectiveMac
+      | TokenType::DirectiveMacpack
+      | TokenType::DirectiveMacro
+      | TokenType::DirectiveMatch
+      | TokenType::DirectiveMax
+      | TokenType::DirectiveMid
+      | TokenType::DirectiveMin
+      | TokenType::DirectiveMod
+      | TokenType::DirectiveNot
+      | TokenType::DirectiveNull
+      | TokenType::DirectiveOr
+      | TokenType::DirectiveOrg
+      | TokenType::DirectiveOut
+      | TokenType::DirectiveP02
+      | TokenType::DirectiveP4510
+      | TokenType::DirectiveP816
+      | TokenType::DirectivePagelen
+      | TokenType::DirectivePagelength
+      | TokenType::DirectiveParamcount
+      | TokenType::DirectivePc02
+      | TokenType::DirectivePopcpu
+      | TokenType::DirectivePopseg
+      | TokenType::DirectiveProc
+      | TokenType::DirectivePsc02
+      | TokenType::DirectivePushcpu
+      | TokenType::DirectivePushseg
+      | TokenType::DirectiveRef
+      | TokenType::DirectiveReferenced
+      | TokenType::DirectiveReloc
+      | TokenType::DirectiveRepeat
+      | TokenType::DirectiveRes
+      | TokenType::DirectiveRight
+      | TokenType::DirectiveRodata
+      | TokenType::DirectiveScope
+      | TokenType::DirectiveSegment
+      | TokenType::DirectiveSet
+      | TokenType::DirectiveSetcpu
+      | TokenType::DirectiveShl
+      | TokenType::DirectiveShr
+      | TokenType::DirectiveSizeof
+      | TokenType::DirectiveSmart
+      | TokenType::DirectiveSprintf
+      | TokenType::DirectiveStrat
+      | TokenType::DirectiveString
+      | TokenType::DirectiveStrlen
+      | TokenType::DirectiveStruct
+      | TokenType::DirectiveTag
+      | TokenType::DirectiveTcount
+      | TokenType::DirectiveTime
+      | TokenType::DirectiveUndef
+      | TokenType::DirectiveUndefine
+      | TokenType::DirectiveUnion
+      | TokenType::DirectiveVersion
+      | TokenType::DirectiveWarning
+      | TokenType::DirectiveWord
+      | TokenType::DirectiveXmatch
+      | TokenType::DirectiveXor
+      | TokenType::DirectiveZeropage => true,
+      _ => false,
     }
   }
 }

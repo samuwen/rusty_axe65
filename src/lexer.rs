@@ -1,4 +1,5 @@
 use crate::char_helper::*;
+use crate::opcode::is_opcode;
 use crate::token::{Token, TokenType};
 
 pub fn lex(file: &String) -> Vec<Token> {
@@ -16,11 +17,7 @@ pub fn lex(file: &String) -> Vec<Token> {
   out_vec.push(next);
   out_vec
     .into_iter()
-    .filter(|t| {
-      t.get_type() != &TokenType::Whitespace
-        && t.get_type() != &TokenType::Comment
-        && t.get_type() != &TokenType::Newline
-    })
+    .filter(|t| t.get_type() != &TokenType::Whitespace && t.get_type() != &TokenType::Comment)
     .collect()
 }
 
@@ -131,7 +128,10 @@ fn handle_identifier(chars: &mut Characters) -> Token {
       "Y" => TokenType::YRegister,
       _ => panic!("Unknown single char identifier: {}", token_string),
     },
-    _ => TokenType::Identifier,
+    _ => match is_opcode(&token_string) {
+      true => TokenType::Opcode,
+      false => TokenType::Identifier,
+    },
   };
   Token::new(token_string, t, start, chars.get_index())
 }
