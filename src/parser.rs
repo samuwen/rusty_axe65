@@ -1,5 +1,5 @@
 use crate::node::{Node, NodeType};
-use crate::opcode::is_opcode;
+use crate::opcode::*;
 use crate::token::{Token, TokenType};
 use log::*;
 
@@ -150,13 +150,79 @@ fn parse_local_label(tokens: &mut Vec<Token>) -> Node<String> {
 
 // <unnamed-label> ::= ":"
 fn parse_unnamed_label(tokens: &mut Vec<Token>) -> Node<String> {
-  let unnamed = Node::new(NodeType::LocalLabel);
+  let unnamed = Node::new(NodeType::UnnamedLabel);
   get_next_token_checked(tokens, vec![TokenType::Colon]);
   unnamed
 }
 
+// <opcode> ::= <accumulator-mode> | <immediate-mode> | <direct-memory-mode> | <indirect-memory-mode>
 fn parse_opcode(tokens: &mut Vec<Token>) -> Node<String> {
-  todo!();
+  let mut op_node = Node::new(NodeType::OpcodeStatement);
+  let next = peek_next_token(tokens);
+  if is_accumulator(next.get_value()) {
+    op_node.add_child(parse_accumulator(tokens));
+  }
+  let after_next = peek_two_ahead(tokens);
+  let child_op_node = match after_next.get_type() {
+    TokenType::Hash => parse_immediate(tokens),
+    TokenType::OParen => parse_indirect(tokens),
+    _ => parse_direct(tokens),
+  };
+  op_node.add_child(child_op_node);
+  op_node
+}
+
+// <accumulator-mode> ::= <op-id>
+fn parse_accumulator(tokens: &mut Vec<Token>) -> Node<String> {
+  let mut acc_node = Node::new(NodeType::AccumulatorMode);
+  let code = get_next_token_checked(tokens, vec![TokenType::Opcode]);
+  acc_node.add_data(code.get_value());
+  acc_node
+}
+
+// <immediate-mode> ::= <op-id> "#" <expression>
+fn parse_immediate(tokens: &mut Vec<Token>) -> Node<String> {
+  let mut imm_node = Node::new(NodeType::ImmediateMode);
+  let code = get_next_token_checked(tokens, vec![TokenType::Opcode]);
+  imm_node.add_data(code.get_value());
+  get_next_token_checked(tokens, vec![TokenType::Hash]);
+  let expression = parse_expression(tokens);
+  imm_node.add_child(expression);
+  imm_node
+}
+
+// <direct-memory-mode> ::= <op-id> <expression>
+fn parse_direct(tokens: &mut Vec<Token>) -> Node<String> {
+  let code = get_next_token_checked(tokens, vec![TokenType::Opcode]);
+  let mut dir_node = Node::new(NodeType::DirectMode);
+  let expression = parse_expression(tokens);
+  dir_node.add_data(code.get_value());
+  dir_node.add_child(expression);
+  dir_node
+}
+
+// <indirect-memory-mode> ::= <indirect-x> | <indirect-y>
+fn parse_indirect(tokens: &mut Vec<Token>) -> Node<String> {
+  let code = get_next_token_checked(tokens, vec![TokenType::Opcode]);
+  get_next_token_checked(tokens, vec![TokenType::OParen]);
+  let expression = parse_expression(tokens);
+  let disambiguator = get_next_token_checked(tokens, vec![TokenType::Comma, TokenType::CParen]);
+  let mut ind_node = match disambiguator.get_type() {
+    TokenType::Comma => {
+      get_next_token_checked(tokens, vec![TokenType::XRegister]);
+      get_next_token_checked(tokens, vec![TokenType::CParen]);
+      Node::new(NodeType::IndirectXMode)
+    }
+    _ => {
+      get_next_token_checked(tokens, vec![TokenType::CParen]);
+      get_next_token_checked(tokens, vec![TokenType::Comma]);
+      get_next_token_checked(tokens, vec![TokenType::YRegister]);
+      Node::new(NodeType::IndirectYMode)
+    }
+  };
+  ind_node.add_data(code.get_value());
+  ind_node.add_child(expression);
+  ind_node
 }
 
 fn parse_expression(tokens: &mut Vec<Token>) -> Node<String> {

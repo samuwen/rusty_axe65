@@ -11,38 +11,12 @@ pub fn is_opcode(t: &str) -> bool {
 }
 
 // Also includes accumulator
-pub fn _get_implied(code: &str) -> u8 {
+pub fn is_accumulator(code: &str) -> bool {
   match code.to_ascii_lowercase().as_str() {
-    "asl" => 0x0A,
-    "brk" => 0x00,
-    "clc" => 0x18,
-    "cld" => 0xD8,
-    "cli" => 0x58,
-    "clv" => 0xB8,
-    "dex" => 0xCA,
-    "dey" => 0x88,
-    "inx" => 0xE8,
-    "iny" => 0xC8,
-    "lsr" => 0x4A,
-    "pha" => 0x48,
-    "pla" => 0x68,
-    "php" => 0x08,
-    "plp" => 0x28,
-    "nop" => 0xEA,
-    "rol" => 0x2A,
-    "ror" => 0x6A,
-    "rti" => 0x40,
-    "rts" => 0x60,
-    "sec" => 0x38,
-    "sed" => 0xF8,
-    "sei" => 0x78,
-    "tax" => 0xAA,
-    "tay" => 0xA8,
-    "tsx" => 0xBA,
-    "txa" => 0x8A,
-    "txs" => 0x9A,
-    "tya" => 0x98,
-    _ => panic!("{} is not an implied opcode", code),
+    "asl" | "brk" | "clc" | "cld" | "cli" | "clv" | "dex" | "dey" | "inx" | "iny" | "lsr"
+    | "pha" | "pla" | "php" | "plp" | "nop" | "rol" | "ror" | "rti" | "rts" | "sec" | "sed"
+    | "sei" | "tax" | "tay" | "tsx" | "txa" | "txs" | "tya" => true,
+    _ => false,
   }
 }
 
