@@ -225,7 +225,84 @@ fn parse_indirect(tokens: &mut Vec<Token>) -> Node<String> {
   ind_node
 }
 
+// <expression> ::= <bool-not-exp>
 fn parse_expression(tokens: &mut Vec<Token>) -> Node<String> {
+  let mut node = Node::new(NodeType::Expression);
+  let child = parse_bool_not_exp(tokens);
+  node.add_child(child);
+  node
+}
+
+// <bool-not-exp> ::= "!" <expression> | <bool_or_exp>
+fn parse_bool_not_exp(tokens: &mut Vec<Token>) -> Node<String> {
+  let next = peek_next_token(tokens);
+  match next.get_type() {
+    TokenType::Not => {
+      let token = get_next_token(tokens);
+      let mut node = Node::new(NodeType::NotExp);
+      node.add_data(token.get_value());
+      let expression = parse_expression(tokens);
+      node.add_child(expression);
+      node
+    }
+    _ => parse_bool_or_exp(tokens),
+  }
+}
+
+// <bool-or-exp> ::= <bool-xor-and-exp> { ("&&"|"XOR"|"AND") <bool-xor-and-exp> }
+fn parse_bool_or_exp(tokens: &mut Vec<Token>) -> Node<String> {
+  let mut xor_exp = parse_bool_xor_and_exp(tokens);
+  let mut next = peek_next_token(tokens);
+  while next.is_xor_and() {
+    let op = get_next_token(tokens);
+    let mut node = Node::new(NodeType::BinaryOp);
+    node.add_data(op.get_value());
+    let next_exp = parse_bool_xor_and_exp(tokens);
+    node.add_child(xor_exp);
+    node.add_child(next_exp);
+    xor_exp = node;
+    next = peek_next_token(tokens);
+  }
+  xor_exp
+}
+
+// <bool-xor-and-exp> ::= <relational-exp> { ("="|"<>"|"<"|">"|"<="|">=") <relational-exp> }
+fn parse_bool_xor_and_exp(tokens: &mut Vec<Token>) -> Node<String> {
+  todo!();
+}
+
+// <relational-exp> ::= <binary-add-sub-exp> { ("+"|"-"|"|"|"BITOR") <binary-add-sub-exp> }
+fn parse_relational_exp(tokens: &mut Vec<Token>) -> Node<String> {
+  todo!();
+}
+
+// <binary-add-sub-exp> ::= <bitwise-mul-div-exp> { ("_"|"/"|"<<"|">>"|"^"|"&"|"MOD"|"BITAND"|"BITXOR"|"SHL"|"SHR") <bitwise-mul-div-exp> }
+fn parse_binary_add_sub_exp(tokens: &mut Vec<Token>) -> Node<String> {
+  todo!();
+}
+
+// <bitwise-mul-div-exp> ::= <unary-exp> { ("^"|">"|"<"|"~"|"+"|"-"|<built-in-pseudo-variable>|<built-in-pseudo-function>|"BITNOT") <unary-exp> }
+fn parse_bitwise_mul_div_exp(tokens: &mut Vec<Token>) -> Node<String> {
+  todo!();
+}
+
+// <unary-exp> ::= <factor> { (".CONCAT") <factor> }
+fn parse_unary_exp(tokens: &mut Vec<Token>) -> Node<String> {
+  todo!();
+}
+
+// <factor> ::= "(" <expression> ")" | <id> | <number>
+fn parse_factor(tokens: &mut Vec<Token>) -> Node<String> {
+  todo!();
+}
+
+// <built-in-pseudo-variable> ::= ("_"|"ASIZE"|"CPU"|"ISIZE"|"PARAMCOUNT"|"TIME"|"VERSION")
+fn parse_built_in_pseuo_variable(tokens: &mut Vec<Token>) -> Node<String> {
+  todo!();
+}
+
+// <built-in-pseudo-function> ::= ("ADDRSIZE"|"BANK"|"BANKBYTE"|"BLANK"|"CONST"|"HIBYTE"|"HIWORD"|"IDENT"|"LEFT"|"LOBYTE"|"LOWORD"|"MATCH"|"MAX"|"MID"|"MIN"|"REF"|"REFERENCED"|"RIGHT"|"SIZEOF"|"STRAT"|"SPRINTF"|"STRING"|"STRLEN"|"TCOUNT"|"XMATCH")
+fn parse_built_in_pseuo_function(tokens: &mut Vec<Token>) -> Node<String> {
   todo!();
 }
 

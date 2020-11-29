@@ -64,6 +64,10 @@ impl Token {
   pub fn is_terminus(&self) -> bool {
     self.get_type() == &TokenType::EndOfFile || self.get_type() == &TokenType::Newline
   }
+
+  pub fn is_xor_and(&self) -> bool {
+    self.get_type() == &TokenType::Xor || self.get_type() == &TokenType::And
+  }
 }
 
 impl fmt::Display for Token {
