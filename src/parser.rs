@@ -1,7 +1,6 @@
 use crate::node::{Node, NodeType};
 use crate::opcode::*;
 use crate::token::{Token, TokenType};
-use log::*;
 
 // <program> ::= { <statement> }
 pub fn parse(mut tokens: Vec<Token>) -> Node<String> {
@@ -17,6 +16,9 @@ pub fn parse(mut tokens: Vec<Token>) -> Node<String> {
 // <statement> ::= <assignment> | <directive> | <label> | <opcode>
 fn parse_statement(tokens: &mut Vec<Token>) -> Node<String> {
   let next = peek_next_token(tokens);
+  if next.get_line() == &52 {
+    let hi = "hi";
+  }
   if is_opcode(next.get_value()) {
     return parse_opcode(tokens);
   }
@@ -57,7 +59,7 @@ fn parse_directive(tokens: &mut Vec<Token>) -> Node<String> {
 fn parse_dir_segment(tokens: &mut Vec<Token>) -> Node<String> {
   let directive = get_next_token(tokens);
   if directive.get_value() != "segment" {
-    panic!("Invalid segment token {}", directive.get_value());
+    error(&directive);
   }
   let mut segment = Node::new(NodeType::DirectiveSegment);
   let name = get_next_token_checked(tokens, vec![TokenType::StringConst]);
@@ -70,7 +72,7 @@ fn parse_dir_segment(tokens: &mut Vec<Token>) -> Node<String> {
 fn validate_dir_seg_name(token: &Token) {
   let val = token.get_value().to_ascii_uppercase();
   if !(val.len() > 1 && &val == token.get_value()) {
-    panic!("Segment directive name is invalid: {}", token.get_value());
+    error(token);
   }
 }
 
@@ -88,7 +90,7 @@ fn parse_dir_other(tokens: &mut Vec<Token>) -> Node<String> {
 fn validate_dir_name(token: &Token) {
   let val = token.get_value().to_ascii_lowercase();
   if !(val.len() > 1 && &val == token.get_value()) {
-    panic!("Directive name is invalid: {}", token.get_value());
+    error(token);
   }
 }
 
@@ -157,16 +159,20 @@ fn parse_unnamed_label(tokens: &mut Vec<Token>) -> Node<String> {
 fn parse_opcode(tokens: &mut Vec<Token>) -> Node<String> {
   let mut op_node = Node::new(NodeType::OpcodeStatement);
   let next = peek_next_token(tokens);
-  if is_accumulator(next.get_value()) {
-    op_node.add_child(parse_accumulator(tokens));
+  match is_accumulator(next.get_value()) {
+    true => {
+      op_node.add_child(parse_accumulator(tokens));
+    }
+    false => {
+      let after_next = peek_two_ahead(tokens);
+      let child_op_node = match after_next.get_type() {
+        TokenType::Hash => parse_immediate(tokens),
+        TokenType::OParen => parse_indirect(tokens),
+        _ => parse_direct(tokens),
+      };
+      op_node.add_child(child_op_node);
+    }
   }
-  let after_next = peek_two_ahead(tokens);
-  let child_op_node = match after_next.get_type() {
-    TokenType::Hash => parse_immediate(tokens),
-    TokenType::OParen => parse_indirect(tokens),
-    _ => parse_direct(tokens),
-  };
-  op_node.add_child(child_op_node);
   op_node
 }
 
@@ -201,10 +207,7 @@ fn parse_direct(tokens: &mut Vec<Token>) -> Node<String> {
       match reg.get_type() {
         TokenType::XRegister => NodeType::DirectRegXMode,
         TokenType::YRegister => NodeType::DirectRegYMode,
-        _ => panic!(
-          "Invalid identifier in direct register mode {:?}",
-          reg.get_type()
-        ),
+        _ => error(&reg),
       }
     }
     _ => NodeType::DirectMode,
@@ -304,7 +307,8 @@ fn parse_factor(tokens: &mut Vec<Token>) -> Node<String> {
     }
     TokenType::Identifier => parse_variable(tokens),
     TokenType::BinNumber | TokenType::HexNumber | TokenType::DecNumber => parse_number(tokens),
-    _ => panic!("Invalid factor {:?}", token.get_type()),
+    TokenType::ULabel => parse_ulabel(tokens),
+    _ => error(&token),
   }
 }
 
@@ -315,14 +319,21 @@ fn parse_variable(tokens: &mut Vec<Token>) -> Node<String> {
   node
 }
 
+fn parse_ulabel(tokens: &mut Vec<Token>) -> Node<String> {
+  let token = get_next_token(tokens);
+  let mut node = Node::new(NodeType::LabelJump);
+  node.add_data(token.get_value());
+  node
+}
+
 // Take hex/bin/dec number and return it without control chars as decimal number
 fn parse_number(tokens: &mut Vec<Token>) -> Node<String> {
   let token = get_next_token(tokens);
   let num = match token.get_type() {
-    TokenType::HexNumber => u8::from_str_radix(&token.get_value()[1..], 16),
-    TokenType::BinNumber => u8::from_str_radix(&token.get_value()[1..], 2),
-    TokenType::DecNumber => u8::from_str_radix(&token.get_value(), 10),
-    _ => panic!("Invalid number given {}", token.get_value()),
+    TokenType::HexNumber => u16::from_str_radix(&token.get_value()[1..], 16),
+    TokenType::BinNumber => u16::from_str_radix(&token.get_value()[1..], 2),
+    TokenType::DecNumber => u16::from_str_radix(&token.get_value(), 10),
+    _ => error(&token),
   };
   match num {
     Ok(val) => {
@@ -330,7 +341,7 @@ fn parse_number(tokens: &mut Vec<Token>) -> Node<String> {
       node.add_data(&val.to_string());
       node
     }
-    Err(e) => panic!("Invalid number {}", e),
+    Err(e) => error(&token),
   }
 }
 
@@ -382,7 +393,7 @@ fn get_next_token_checked(tokens: &mut Vec<Token>, expected: Vec<TokenType>) -> 
   let token = get_next_token(tokens);
   let valid = expected.iter().any(|t| token.get_type() == t);
   if !valid {
-    panic!("Expected {:?} but got {:?}", expected, token.get_type());
+    error(&token);
   }
   token
 }
@@ -403,6 +414,15 @@ fn peek(tokens: &Vec<Token>, count: usize) -> Token {
   let option = tokens.get(count);
   match option {
     Some(token) => token.clone(),
-    None => Token::new(String::from(""), TokenType::EndOfFile, 0, 0),
+    None => Token::new(String::from(""), TokenType::EndOfFile, 0, 0, 0),
   }
+}
+
+fn error(token: &Token) -> ! {
+  panic!(
+    "Invalid token.\nToken Type: {:?}\nToken Value: {}\nLine Number: {}",
+    token.get_type(),
+    token.get_value(),
+    token.get_line()
+  );
 }

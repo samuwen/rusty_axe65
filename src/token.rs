@@ -7,15 +7,17 @@ pub struct Token {
   t_type: TokenType,
   start: usize,
   end: usize,
+  line: usize,
 }
 
 impl Token {
-  pub fn new(val: String, t: TokenType, start: usize, end: usize) -> Token {
+  pub fn new(val: String, t: TokenType, start: usize, end: usize, line: usize) -> Token {
     Token {
-      val: val,
+      val,
       t_type: t,
-      start: start,
-      end: end,
+      start,
+      end,
+      line,
     }
   }
 
@@ -33,6 +35,10 @@ impl Token {
 
   pub fn _get_end(&self) -> &usize {
     &self.end
+  }
+
+  pub fn get_line(&self) -> &usize {
+    &self.line
   }
 
   fn get_type_padding(&self) -> String {

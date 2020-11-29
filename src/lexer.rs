@@ -1,6 +1,13 @@
 use crate::char_helper::*;
 use crate::opcode::is_opcode;
 use crate::token::{Token, TokenType};
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+static LINE_COUNTER: AtomicUsize = AtomicUsize::new(1);
+
+fn line_num() -> usize {
+  LINE_COUNTER.load(Ordering::Relaxed)
+}
 
 pub fn lex(file: &String) -> Vec<Token> {
   if &file[file.len() - 1..] != "\n" {
@@ -29,7 +36,13 @@ fn next_token(chars: &mut Characters) -> Token {
   let empty = String::from("");
   let start = chars.get_index();
   if chars.get_index() >= chars.max_size() {
-    return Token::new(empty, TokenType::EndOfFile, start, chars.max_size());
+    return Token::new(
+      empty,
+      TokenType::EndOfFile,
+      start,
+      chars.max_size(),
+      line_num(),
+    );
   }
   let next = chars.get_next();
   if is_num_signifier(next) {
@@ -48,12 +61,25 @@ fn next_token(chars: &mut Characters) -> Token {
     return handle_operator(chars);
   }
   if is_whitespace(next) {
-    return Token::new(empty, TokenType::Whitespace, start, chars.get_index());
+    return Token::new(
+      empty,
+      TokenType::Whitespace,
+      start,
+      chars.get_index(),
+      line_num(),
+    );
   }
   if is_newline(next) {
-    return Token::new(empty, TokenType::Newline, start, chars.get_index());
+    LINE_COUNTER.fetch_add(1, Ordering::Relaxed);
+    return Token::new(
+      empty,
+      TokenType::Newline,
+      start,
+      chars.get_index(),
+      line_num(),
+    );
   }
-  Token::new(String::from(""), TokenType::EndOfFile, 0, 0)
+  Token::new(String::from(""), TokenType::EndOfFile, 0, 0, line_num())
 }
 
 fn handle_number(chars: &mut Characters) -> Token {
@@ -83,7 +109,7 @@ fn create_number_token<F: Fn(char) -> bool>(
     token_string.push(c);
     next = chars.peek_next();
   }
-  Token::new(token_string, t, start, chars.get_index())
+  Token::new(token_string, t, start, chars.get_index(), line_num())
 }
 
 fn handle_control_command(chars: &mut Characters) -> Token {
@@ -100,6 +126,7 @@ fn handle_control_command(chars: &mut Characters) -> Token {
     TokenType::get_directive_type(&dir_string),
     start,
     chars.get_index(),
+    line_num(),
   )
 }
 
@@ -115,6 +142,7 @@ fn handle_local_label(chars: &mut Characters) -> Token {
     TokenType::LocalLabel,
     start,
     chars.get_index(),
+    line_num(),
   )
 }
 
@@ -136,7 +164,7 @@ fn handle_identifier(chars: &mut Characters) -> Token {
       false => TokenType::Identifier,
     },
   };
-  Token::new(token_string, t, start, chars.get_index())
+  Token::new(token_string, t, start, chars.get_index(), line_num())
 }
 
 fn handle_operator(chars: &mut Characters) -> Token {
@@ -217,11 +245,11 @@ fn get_identifier_text(chars: &mut Characters) -> String {
 }
 
 fn handle_single_operator(c: char, t: TokenType, s: usize, e: usize) -> Token {
-  Token::new(String::from(c), t, s, e)
+  Token::new(String::from(c), t, s, e, line_num())
 }
 
 fn handle_combo_operator(c: &str, t: TokenType, s: usize, e: usize) -> Token {
-  Token::new(String::from(c), t, s, e)
+  Token::new(String::from(c), t, s, e, line_num())
 }
 
 fn handle_unnamed_label(
@@ -238,7 +266,7 @@ fn handle_unnamed_label(
     out_string.push(c);
     next = chars.peek_next();
   }
-  Token::new(out_string, t, s, e)
+  Token::new(out_string, t, s, e, line_num())
 }
 
 fn handle_comment(chars: &mut Characters) -> Token {
@@ -250,7 +278,13 @@ fn handle_comment(chars: &mut Characters) -> Token {
     end.push(c);
     next = chars.peek_next();
   }
-  Token::new(end, TokenType::Comment, start, chars.get_index())
+  Token::new(
+    end,
+    TokenType::Comment,
+    start,
+    chars.get_index(),
+    line_num(),
+  )
 }
 
 fn handle_string_constant(chars: &mut Characters, s: usize) -> Token {
@@ -265,7 +299,13 @@ fn handle_string_constant(chars: &mut Characters, s: usize) -> Token {
   if close_quote != '"' {
     panic!("String constant quotes not closed");
   }
-  Token::new(out_string, TokenType::StringConst, s, chars.get_index())
+  Token::new(
+    out_string,
+    TokenType::StringConst,
+    s,
+    chars.get_index(),
+    line_num(),
+  )
 }
 
 struct Characters {

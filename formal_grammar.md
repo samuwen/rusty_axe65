@@ -38,7 +38,7 @@
 <binary-add-sub-exp> ::= <bitwise-mul-div-exp> { ("\*"|"/"|"<<"|">>"|"^"|"&"|"MOD"|"BITAND"|"BITXOR"|"SHL"|"SHR") <bitwise-mul-div-exp> }
 <bitwise-mul-div-exp> ::= <unary-op> <bitwise-mul-div-exp> | <unary-exp>
 <unary-exp> ::= <factor> { (".CONCAT") <factor> }
-<factor> ::= "(" <expression> ")" | <id> | <number>
+<factor> ::= "(" <expression> ")" | <id> | <number> | <ulabel>
 <unary-op> ::= ("^"|">"|"<"|"~"|"+"|"-"|<built-in-pseudo-variable>|<built-in-pseudo-function>|"BITNOT")
 <built-in-pseudo-variable> ::= ("\_"|"ASIZE"|"CPU"|"ISIZE"|"PARAMCOUNT"|"TIME"|"VERSION")
 <built-in-pseudo-function> ::= ("ADDRSIZE"|"BANK"|"BANKBYTE"|"BLANK"|"CONST"|"HIBYTE"|"HIWORD"|"IDENT"|"LEFT"|"LOBYTE"|"LOWORD"|"MATCH"|"MAX"|"MID"|"MIN"|"REF"|"REFERENCED"|"RIGHT"|"SIZEOF"|"STRAT"|"SPRINTF"|"STRING"|"STRLEN"|"TCOUNT"|"XMATCH")
@@ -54,3 +54,4 @@
 <symbol> ::= "|" | "!" | "#" | "$" | "%" | "&" | "(" | ")" | "\*" | "+" | "," | "-" | "." | "/" | ":" | ";" | ">" | "=" | "<" | "?" | "@" | "[" | "\" | "]" | "^" | "_" | "`" | "{" | "}" | "~"
 <single-quote> ::= "\'"
 <double-quote> ::= "\""
+<ulabel> ::= ":" ("-"|"+") { ("-"|"+") }
