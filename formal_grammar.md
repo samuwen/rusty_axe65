@@ -10,7 +10,8 @@
 <dir-seg-name> ::= <double-quote> <up-case-letter> { <up-case-letter> } <double-quote>
 <dir-other> ::= <dir-name> { <dir-arg> }
 <dir-name> ::= "." <low-case-letter> { <low-case-letter> }
-<dir-arg> ::= <dir-string-arg> | <id> | <dir-value> { "," <dir-arg> }
+<dir-arg> ::= (<string-const>|<expression>) { "," <dir-arg> }
+<string-const> ::= <dir-string-arg> | <dir-value>
 <dir-string-arg> ::= <double-quote> <letter> { (<letter>|<symbol>) } <double-quote>
 <dir-value> ::= <single-quote> <letter> <single-quote> | <number>
 

@@ -224,6 +224,7 @@ fn handle_operator(chars: &mut Characters) -> Token {
       '#' => handle_single_operator(current, TokenType::Hash, start, end),
       ':' => handle_single_operator(current, TokenType::Colon, start, end),
       '"' => handle_string_constant(chars, start),
+      '\'' => handle_char_constant(chars, start),
       _ => panic!("Unrecognized operator: {}", current),
     },
   }
@@ -232,7 +233,11 @@ fn handle_operator(chars: &mut Characters) -> Token {
 fn get_identifier_text(chars: &mut Characters) -> String {
   let mut next = chars.get_current();
   if !is_id_start(next) {
-    panic!("Invalid identifier starting point \"{}\"", next);
+    panic!(
+      "Invalid identifier starting point \"{}\" | line: {}",
+      next,
+      line_num()
+    );
   }
   let mut token_string = String::from(next);
   next = chars.peek_next();
@@ -298,6 +303,27 @@ fn handle_string_constant(chars: &mut Characters, s: usize) -> Token {
   let close_quote = chars.get_next();
   if close_quote != '"' {
     panic!("String constant quotes not closed");
+  }
+  Token::new(
+    out_string,
+    TokenType::StringConst,
+    s,
+    chars.get_index(),
+    line_num(),
+  )
+}
+
+fn handle_char_constant(chars: &mut Characters, s: usize) -> Token {
+  let mut next = chars.peek_next();
+  let mut out_string = String::new();
+  while next != '\'' {
+    let c = chars.get_next();
+    out_string.push(c);
+    next = chars.peek_next();
+  }
+  let close_quote = chars.get_next();
+  if close_quote != '\'' {
+    panic!("Char constant quotes not closed");
   }
   Token::new(
     out_string,

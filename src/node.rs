@@ -55,7 +55,7 @@ impl Node<String> {
       tabs.push_str("  ");
     }
     let mut return_str = format!(
-      "{}type: {:?} | data: {} | children:\n",
+      "{}type: {:?} | data: \"{}\"\n",
       tabs,
       self.n_type,
       self.data.join(", ")

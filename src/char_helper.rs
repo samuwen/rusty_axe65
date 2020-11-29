@@ -1,5 +1,5 @@
 pub fn is_id_start(c: char) -> bool {
-  c.is_ascii_alphabetic() || c == '_'
+  c.is_ascii_alphabetic() || c == '_' || c == '@'
 }
 
 pub fn is_hex_signifier(c: char) -> bool {
@@ -29,7 +29,7 @@ pub fn is_local_label_signifier(c: char) -> bool {
 pub fn is_operator(c: char) -> bool {
   match c {
     '+' | '-' | '/' | '*' | '^' | '&' | '|' | ':' | '=' | ',' | ';' | '#' | '(' | ')' | '['
-    | ']' | '{' | '}' | '<' | '>' | '!' | '~' | '"' | '\\' => true,
+    | ']' | '{' | '}' | '<' | '>' | '!' | '~' | '"' | '\'' | '\\' => true,
     _ => false,
   }
 }

@@ -94,23 +94,31 @@ fn validate_dir_name(token: &Token) {
   }
 }
 
-// <dir-arg> ::= <dir-string-arg> | <id> | <dir-value> { "," <dir-arg> }
+// <dir-arg> ::= (<string-const>|<expression>) { "," <dir-arg> }
 fn parse_dir_args(tokens: &mut Vec<Token>) -> Node<String> {
   let mut dir_args = Node::new(NodeType::DirArgs);
-  let dir_arg = parse_dir_value(tokens);
+  let next = peek_next_token(tokens);
+  let dir_arg = match next.get_type() {
+    TokenType::StringConst => parse_string_const(tokens),
+    _ => parse_expression(tokens),
+  };
   dir_args.add_child(dir_arg);
   let mut next = peek_next_token(tokens);
   while next.get_type() == &TokenType::Comma {
-    get_next_token(tokens); // discard comma
-    let dir_arg = parse_dir_value(tokens);
+    get_next_token(tokens);
+    let token = peek_next_token(tokens);
+    let dir_arg = match token.get_type() {
+      TokenType::StringConst => parse_string_const(tokens),
+      _ => parse_expression(tokens),
+    };
     dir_args.add_child(dir_arg);
     next = peek_next_token(tokens);
   }
   dir_args
 }
 
-// <dir-value> ::= (<double-quote>|<single-quote>) <letter> { (<letter>|<symbol>) } (<double-quote>|<single-quote>)
-fn parse_dir_value(tokens: &mut Vec<Token>) -> Node<String> {
+// <string-const> ::= <dir-string-arg> | <dir-value>
+fn parse_string_const(tokens: &mut Vec<Token>) -> Node<String> {
   let mut string = Node::new(NodeType::String);
   let token = get_next_token(tokens);
   string.add_data(token.get_value());
@@ -142,7 +150,7 @@ fn parse_normal_label(tokens: &mut Vec<Token>) -> Node<String> {
 // <local-label> ::= "@" <id> ":"
 fn parse_local_label(tokens: &mut Vec<Token>) -> Node<String> {
   let mut local_label = Node::new(NodeType::LocalLabel);
-  let id = get_next_token_checked(tokens, vec![TokenType::Identifier]);
+  let id = get_next_token_checked(tokens, vec![TokenType::LocalLabel]);
   get_next_token_checked(tokens, vec![TokenType::Colon]);
   local_label.add_data(id.get_value());
   local_label
@@ -305,7 +313,7 @@ fn parse_factor(tokens: &mut Vec<Token>) -> Node<String> {
       get_next_token_checked(tokens, vec![TokenType::CParen]);
       exp
     }
-    TokenType::Identifier => parse_variable(tokens),
+    TokenType::Identifier | TokenType::LocalLabel => parse_variable(tokens),
     TokenType::BinNumber | TokenType::HexNumber | TokenType::DecNumber => parse_number(tokens),
     TokenType::ULabel => parse_ulabel(tokens),
     _ => error(&token),
