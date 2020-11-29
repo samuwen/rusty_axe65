@@ -90,6 +90,8 @@ pub enum NodeType {
   AccumulatorMode,
   ImmediateMode,
   DirectMode,
+  DirectRegXMode,
+  DirectRegYMode,
   IndirectXMode,
   IndirectYMode,
   BinaryOp,

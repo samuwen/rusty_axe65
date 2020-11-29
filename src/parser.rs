@@ -43,10 +43,10 @@ fn parse_assignment(tokens: &mut Vec<Token>) -> Node<String> {
 
 // <directive> ::= <dir-segment> | <dir-other>
 fn parse_directive(tokens: &mut Vec<Token>) -> Node<String> {
-  let directive = get_next_token(tokens);
+  let directive = peek_next_token(tokens);
   let mut dir_statement = Node::new(NodeType::DirectiveStatement);
   let child = match directive.get_type() {
-    TokenType::DirectiveSegment => parse_dir_segment(tokens, directive),
+    TokenType::DirectiveSegment => parse_dir_segment(tokens),
     _ => parse_dir_other(tokens),
   };
   dir_statement.add_child(child);
@@ -54,7 +54,8 @@ fn parse_directive(tokens: &mut Vec<Token>) -> Node<String> {
 }
 
 // <dir-segment> ::= ".segment" <dir-seg-name>
-fn parse_dir_segment(tokens: &mut Vec<Token>, directive: Token) -> Node<String> {
+fn parse_dir_segment(tokens: &mut Vec<Token>) -> Node<String> {
+  let directive = get_next_token(tokens);
   if directive.get_value() != "segment" {
     panic!("Invalid segment token {}", directive.get_value());
   }
@@ -78,12 +79,8 @@ fn parse_dir_other(tokens: &mut Vec<Token>) -> Node<String> {
   let dir_token = get_next_token(tokens);
   validate_dir_name(&dir_token);
   let mut directive = Node::new(NodeType::from_token_type(dir_token.get_type()));
-  let mut next = peek_next_token(tokens);
-  while !next.is_terminus() {
-    let dir_arg = parse_dir_arg(tokens);
-    directive.add_child(dir_arg);
-    next = peek_next_token(tokens);
-  }
+  let dir_args = parse_dir_args(tokens);
+  directive.add_child(dir_args);
   directive
 }
 
@@ -96,12 +93,13 @@ fn validate_dir_name(token: &Token) {
 }
 
 // <dir-arg> ::= <dir-string-arg> | <id> | <dir-value> { "," <dir-arg> }
-fn parse_dir_arg(tokens: &mut Vec<Token>) -> Node<String> {
+fn parse_dir_args(tokens: &mut Vec<Token>) -> Node<String> {
   let mut dir_args = Node::new(NodeType::DirArgs);
   let dir_arg = parse_dir_value(tokens);
   dir_args.add_child(dir_arg);
   let mut next = peek_next_token(tokens);
   while next.get_type() == &TokenType::Comma {
+    get_next_token(tokens); // discard comma
     let dir_arg = parse_dir_value(tokens);
     dir_args.add_child(dir_arg);
     next = peek_next_token(tokens);
@@ -191,11 +189,26 @@ fn parse_immediate(tokens: &mut Vec<Token>) -> Node<String> {
   imm_node
 }
 
-// <direct-memory-mode> ::= <op-id> <expression>
+// <direct-memory-mode> ::= <op-id> <expression> { "," <register> }
 fn parse_direct(tokens: &mut Vec<Token>) -> Node<String> {
   let code = get_next_token_checked(tokens, vec![TokenType::Opcode]);
-  let mut dir_node = Node::new(NodeType::DirectMode);
   let expression = parse_expression(tokens);
+  let next = peek_next_token(tokens);
+  let mut dir_node = Node::new(match next.get_type() {
+    TokenType::Comma => {
+      get_next_token(tokens);
+      let reg = get_next_token(tokens);
+      match reg.get_type() {
+        TokenType::XRegister => NodeType::DirectRegXMode,
+        TokenType::YRegister => NodeType::DirectRegYMode,
+        _ => panic!(
+          "Invalid identifier in direct register mode {:?}",
+          reg.get_type()
+        ),
+      }
+    }
+    _ => NodeType::DirectMode,
+  });
   dir_node.add_data(code.get_value());
   dir_node.add_child(expression);
   dir_node
@@ -214,7 +227,6 @@ fn parse_indirect(tokens: &mut Vec<Token>) -> Node<String> {
       Node::new(NodeType::IndirectXMode)
     }
     _ => {
-      get_next_token_checked(tokens, vec![TokenType::CParen]);
       get_next_token_checked(tokens, vec![TokenType::Comma]);
       get_next_token_checked(tokens, vec![TokenType::YRegister]);
       Node::new(NodeType::IndirectYMode)
@@ -225,85 +237,145 @@ fn parse_indirect(tokens: &mut Vec<Token>) -> Node<String> {
   ind_node
 }
 
-// <expression> ::= <bool-not-exp>
+// <expression> ::= "!" <expression> | <bool-not-exp>
 fn parse_expression(tokens: &mut Vec<Token>) -> Node<String> {
-  let mut node = Node::new(NodeType::Expression);
-  let child = parse_bool_not_exp(tokens);
-  node.add_child(child);
-  node
+  parse_generic_un_exp(
+    tokens,
+    parse_expression,
+    parse_bool_not_exp,
+    Token::is_prec_level_seven,
+  )
 }
 
-// <bool-not-exp> ::= "!" <expression> | <bool_or_exp>
+// <bool-not-exp> ::= <bool-or-exp> { ("||"|"OR") <bool-or-exp> }
 fn parse_bool_not_exp(tokens: &mut Vec<Token>) -> Node<String> {
-  let next = peek_next_token(tokens);
-  match next.get_type() {
-    TokenType::Not => {
-      let token = get_next_token(tokens);
-      let mut node = Node::new(NodeType::NotExp);
-      node.add_data(token.get_value());
-      let expression = parse_expression(tokens);
-      node.add_child(expression);
-      node
-    }
-    _ => parse_bool_or_exp(tokens),
-  }
+  parse_bin_exp(tokens, parse_bool_or_exp, Token::is_prec_level_six)
 }
 
 // <bool-or-exp> ::= <bool-xor-and-exp> { ("&&"|"XOR"|"AND") <bool-xor-and-exp> }
 fn parse_bool_or_exp(tokens: &mut Vec<Token>) -> Node<String> {
-  let mut xor_exp = parse_bool_xor_and_exp(tokens);
-  let mut next = peek_next_token(tokens);
-  while next.is_xor_and() {
-    let op = get_next_token(tokens);
-    let mut node = Node::new(NodeType::BinaryOp);
-    node.add_data(op.get_value());
-    let next_exp = parse_bool_xor_and_exp(tokens);
-    node.add_child(xor_exp);
-    node.add_child(next_exp);
-    xor_exp = node;
-    next = peek_next_token(tokens);
-  }
-  xor_exp
+  parse_bin_exp(tokens, parse_bool_xor_and_exp, Token::is_prec_level_five)
 }
 
 // <bool-xor-and-exp> ::= <relational-exp> { ("="|"<>"|"<"|">"|"<="|">=") <relational-exp> }
 fn parse_bool_xor_and_exp(tokens: &mut Vec<Token>) -> Node<String> {
-  todo!();
+  parse_bin_exp(tokens, parse_relational_exp, Token::is_prec_level_four)
 }
 
 // <relational-exp> ::= <binary-add-sub-exp> { ("+"|"-"|"|"|"BITOR") <binary-add-sub-exp> }
 fn parse_relational_exp(tokens: &mut Vec<Token>) -> Node<String> {
-  todo!();
+  parse_bin_exp(tokens, parse_binary_add_sub_exp, Token::is_prec_level_three)
 }
 
 // <binary-add-sub-exp> ::= <bitwise-mul-div-exp> { ("_"|"/"|"<<"|">>"|"^"|"&"|"MOD"|"BITAND"|"BITXOR"|"SHL"|"SHR") <bitwise-mul-div-exp> }
 fn parse_binary_add_sub_exp(tokens: &mut Vec<Token>) -> Node<String> {
-  todo!();
+  parse_bin_exp(tokens, parse_bitwise_mul_div_exp, Token::is_prec_level_two)
 }
 
-// <bitwise-mul-div-exp> ::= <unary-exp> { ("^"|">"|"<"|"~"|"+"|"-"|<built-in-pseudo-variable>|<built-in-pseudo-function>|"BITNOT") <unary-exp> }
+// <bitwise-mul-div-exp> ::= <unary-op> <bitwise-mul-div-exp> | <unary-exp>
 fn parse_bitwise_mul_div_exp(tokens: &mut Vec<Token>) -> Node<String> {
-  todo!();
+  parse_generic_un_exp(
+    tokens,
+    parse_bitwise_mul_div_exp,
+    parse_unary_exp,
+    Token::is_prec_level_one,
+  )
 }
 
-// <unary-exp> ::= <factor> { (".CONCAT") <factor> }
+// <unary-exp> ::= <built-in-string-function> <unary-exp> | <factor>
 fn parse_unary_exp(tokens: &mut Vec<Token>) -> Node<String> {
-  todo!();
+  parse_generic_un_exp(
+    tokens,
+    parse_unary_exp,
+    parse_factor,
+    Token::is_prec_level_zero,
+  )
 }
 
 // <factor> ::= "(" <expression> ")" | <id> | <number>
 fn parse_factor(tokens: &mut Vec<Token>) -> Node<String> {
-  todo!();
+  let token = peek_next_token(tokens);
+  match token.get_type() {
+    TokenType::OParen => {
+      get_next_token_checked(tokens, vec![TokenType::OParen]);
+      let exp = parse_expression(tokens);
+      get_next_token_checked(tokens, vec![TokenType::CParen]);
+      exp
+    }
+    TokenType::Identifier => parse_variable(tokens),
+    TokenType::BinNumber | TokenType::HexNumber | TokenType::DecNumber => parse_number(tokens),
+    _ => panic!("Invalid factor {:?}", token.get_type()),
+  }
 }
 
-// <built-in-pseudo-variable> ::= ("_"|"ASIZE"|"CPU"|"ISIZE"|"PARAMCOUNT"|"TIME"|"VERSION")
-fn parse_built_in_pseuo_variable(tokens: &mut Vec<Token>) -> Node<String> {
-  todo!();
+fn parse_variable(tokens: &mut Vec<Token>) -> Node<String> {
+  let token = get_next_token(tokens);
+  let mut node = Node::new(NodeType::Variable);
+  node.add_data(token.get_value());
+  node
 }
 
-// <built-in-pseudo-function> ::= ("ADDRSIZE"|"BANK"|"BANKBYTE"|"BLANK"|"CONST"|"HIBYTE"|"HIWORD"|"IDENT"|"LEFT"|"LOBYTE"|"LOWORD"|"MATCH"|"MAX"|"MID"|"MIN"|"REF"|"REFERENCED"|"RIGHT"|"SIZEOF"|"STRAT"|"SPRINTF"|"STRING"|"STRLEN"|"TCOUNT"|"XMATCH")
-fn parse_built_in_pseuo_function(tokens: &mut Vec<Token>) -> Node<String> {
-  todo!();
+// Take hex/bin/dec number and return it without control chars as decimal number
+fn parse_number(tokens: &mut Vec<Token>) -> Node<String> {
+  let token = get_next_token(tokens);
+  let num = match token.get_type() {
+    TokenType::HexNumber => u8::from_str_radix(&token.get_value()[1..], 16),
+    TokenType::BinNumber => u8::from_str_radix(&token.get_value()[1..], 2),
+    TokenType::DecNumber => u8::from_str_radix(&token.get_value(), 10),
+    _ => panic!("Invalid number given {}", token.get_value()),
+  };
+  match num {
+    Ok(val) => {
+      let mut node = Node::new(NodeType::Number);
+      node.add_data(&val.to_string());
+      node
+    }
+    Err(e) => panic!("Invalid number {}", e),
+  }
+}
+
+fn parse_bin_exp<F: Fn(&mut Vec<Token>) -> Node<String>, N: Fn(&Token) -> bool>(
+  tokens: &mut Vec<Token>,
+  next_exp: F,
+  valid_token: N,
+) -> Node<String> {
+  let mut expression = next_exp(tokens);
+  let mut next = peek_next_token(tokens);
+  while valid_token(&next) {
+    let op = get_next_token(tokens);
+    let mut node = Node::new(NodeType::BinaryOp);
+    node.add_data(op.get_value());
+    let next_expression = next_exp(tokens);
+    node.add_child(expression);
+    node.add_child(next_expression);
+    expression = node;
+    next = peek_next_token(tokens);
+  }
+  expression
+}
+
+fn parse_generic_un_exp<
+  F: Fn(&mut Vec<Token>) -> Node<String>,
+  G: Fn(&mut Vec<Token>) -> Node<String>,
+  N: Fn(&Token) -> bool,
+>(
+  tokens: &mut Vec<Token>,
+  next_exp: F,
+  final_exp: G,
+  valid_token: N,
+) -> Node<String> {
+  let next = peek_next_token(tokens);
+  match valid_token(&next) {
+    true => {
+      let token = get_next_token(tokens);
+      let mut node = Node::new(NodeType::UnaryOp);
+      node.add_data(token.get_value());
+      let expression = next_exp(tokens);
+      node.add_child(expression);
+      node
+    }
+    false => final_exp(tokens),
+  }
 }
 
 fn get_next_token_checked(tokens: &mut Vec<Token>, expected: Vec<TokenType>) -> Token {

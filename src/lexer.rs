@@ -17,7 +17,11 @@ pub fn lex(file: &String) -> Vec<Token> {
   out_vec.push(next);
   out_vec
     .into_iter()
-    .filter(|t| t.get_type() != &TokenType::Whitespace && t.get_type() != &TokenType::Comment)
+    .filter(|t| {
+      t.get_type() != &TokenType::Whitespace
+        && t.get_type() != &TokenType::Comment
+        && t.get_type() != &TokenType::Newline
+    })
     .collect()
 }
 
@@ -144,6 +148,7 @@ fn handle_operator(chars: &mut Characters) -> Token {
     true => match current {
       '<' => match next {
         '<' => handle_combo_operator("<<", TokenType::Shl, start, end),
+        '>' => handle_combo_operator("<>", TokenType::NotEqual, start, end),
         '=' => handle_combo_operator("<=", TokenType::LessThanOrEqual, start, end),
         _ => handle_single_operator(current, TokenType::LessThan, start, end),
       },
@@ -159,6 +164,14 @@ fn handle_operator(chars: &mut Characters) -> Token {
         '-' => handle_unnamed_label(TokenType::ULabel, start, end, chars, '-'),
         _ => handle_single_operator(current, TokenType::Colon, start, end),
       },
+      '|' => match next {
+        '|' => handle_combo_operator("||", TokenType::BoolOr, start, end),
+        _ => handle_single_operator(current, TokenType::Or, start, end),
+      },
+      '&' => match next {
+        '&' => handle_combo_operator("&&", TokenType::BoolAnd, start, end),
+        _ => handle_single_operator(current, TokenType::And, start, end),
+      },
       _ => panic!("Not yet implemented {}", current),
     },
     false => match current {
@@ -169,8 +182,6 @@ fn handle_operator(chars: &mut Characters) -> Token {
       '/' => handle_single_operator(current, TokenType::Division, start, end),
       '=' => handle_single_operator(current, TokenType::Equal, start, end),
       '^' => handle_single_operator(current, TokenType::Xor, start, end),
-      '&' => handle_single_operator(current, TokenType::And, start, end),
-      '|' => handle_single_operator(current, TokenType::Or, start, end),
       ',' => handle_single_operator(current, TokenType::Comma, start, end),
       '~' => handle_single_operator(current, TokenType::Not, start, end),
       '!' => handle_single_operator(current, TokenType::BoolNot, start, end),

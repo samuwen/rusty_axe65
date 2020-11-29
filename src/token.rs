@@ -61,12 +61,98 @@ impl Token {
     padding
   }
 
-  pub fn is_terminus(&self) -> bool {
-    self.get_type() == &TokenType::EndOfFile || self.get_type() == &TokenType::Newline
+  pub fn is_prec_level_seven(&self) -> bool {
+    self.get_type() == &TokenType::BoolNot
   }
 
-  pub fn is_xor_and(&self) -> bool {
-    self.get_type() == &TokenType::Xor || self.get_type() == &TokenType::And
+  pub fn is_prec_level_six(&self) -> bool {
+    self.get_type() == &TokenType::BoolOr
+  }
+
+  pub fn is_prec_level_five(&self) -> bool {
+    self.get_type() == &TokenType::BoolXor || self.get_type() == &TokenType::BoolAnd
+  }
+
+  pub fn is_prec_level_four(&self) -> bool {
+    self.get_type() == &TokenType::Equal
+      || self.get_type() == &TokenType::NotEqual
+      || self.get_type() == &TokenType::LessThan
+      || self.get_type() == &TokenType::GreaterThan
+      || self.get_type() == &TokenType::LessThanOrEqual
+      || self.get_type() == &TokenType::GreaterThanOrEqual
+  }
+
+  pub fn is_prec_level_three(&self) -> bool {
+    self.get_type() == &TokenType::Addition
+      || self.get_type() == &TokenType::Subtraction
+      || self.get_type() == &TokenType::Or
+  }
+
+  pub fn is_prec_level_two(&self) -> bool {
+    self.get_type() == &TokenType::Multiplication
+      || self.get_type() == &TokenType::Division
+      || self.get_type() == &TokenType::Shl
+      || self.get_type() == &TokenType::Shr
+      || self.get_type() == &TokenType::Xor
+      || self.get_type() == &TokenType::And
+      || self.get_type() == &TokenType::Modulo
+  }
+
+  pub fn is_prec_level_one(&self) -> bool {
+    self.get_type() == &TokenType::Xor
+      || self.get_type() == &TokenType::GreaterThan
+      || self.get_type() == &TokenType::LessThan
+      || self.get_type() == &TokenType::Not
+      || self.get_type() == &TokenType::Addition
+      || self.get_type() == &TokenType::Subtraction
+      || self.is_built_in_pseudo_var()
+      || self.is_built_in_pseudo_fun()
+  }
+
+  pub fn is_prec_level_zero(&self) -> bool {
+    self.is_built_in_string_fun()
+  }
+
+  fn is_built_in_pseudo_var(&self) -> bool {
+    self.get_type() == &TokenType::Star
+      || self.get_type() == &TokenType::Asize
+      || self.get_type() == &TokenType::Cpu
+      || self.get_type() == &TokenType::Isize
+      || self.get_type() == &TokenType::Paramcount
+      || self.get_type() == &TokenType::Time
+      || self.get_type() == &TokenType::Version
+  }
+
+  fn is_built_in_pseudo_fun(&self) -> bool {
+    self.get_type() == &TokenType::Addrsize
+      || self.get_type() == &TokenType::Bank
+      || self.get_type() == &TokenType::Bankbyte
+      || self.get_type() == &TokenType::Blank
+      || self.get_type() == &TokenType::Const
+      || self.get_type() == &TokenType::Hibyte
+      || self.get_type() == &TokenType::Hiword
+      || self.get_type() == &TokenType::Ident
+      || self.get_type() == &TokenType::Left
+      || self.get_type() == &TokenType::Lobyte
+      || self.get_type() == &TokenType::Loword
+      || self.get_type() == &TokenType::Match
+      || self.get_type() == &TokenType::Max
+      || self.get_type() == &TokenType::Mid
+      || self.get_type() == &TokenType::Min
+      || self.get_type() == &TokenType::Ref
+      || self.get_type() == &TokenType::Referenced
+      || self.get_type() == &TokenType::Right
+      || self.get_type() == &TokenType::Sizeof
+      || self.get_type() == &TokenType::Strat
+      || self.get_type() == &TokenType::Sprintf
+      || self.get_type() == &TokenType::String
+      || self.get_type() == &TokenType::Strlen
+      || self.get_type() == &TokenType::Tcount
+      || self.get_type() == &TokenType::Xmatch
+  }
+
+  fn is_built_in_string_fun(&self) -> bool {
+    self.get_type() == &TokenType::Concat
   }
 }
 
@@ -284,6 +370,7 @@ pub enum TokenType {
   Division,
   Assignment,
   Equal,
+  NotEqual,
   Xor,
   Or,
   And,
@@ -304,11 +391,48 @@ pub enum TokenType {
   Shl,
   Shr,
   BoolNot,
+  BoolAnd,
+  BoolOr,
+  BoolXor,
+  Modulo,
   StringConst,
   Newline,
   Namespace,
   ULabel,
   Opcode,
+  Star,
+  Asize,
+  Cpu,
+  Isize,
+  Paramcount,
+  Time,
+  Version,
+  Addrsize,
+  Bank,
+  Bankbyte,
+  Blank,
+  Const,
+  Hibyte,
+  Hiword,
+  Ident,
+  Left,
+  Lobyte,
+  Loword,
+  Match,
+  Max,
+  Mid,
+  Min,
+  Ref,
+  Referenced,
+  Right,
+  Sizeof,
+  Strat,
+  Sprintf,
+  String,
+  Strlen,
+  Tcount,
+  Xmatch,
+  Concat,
   EndOfFile,
 }
 

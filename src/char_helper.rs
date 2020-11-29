@@ -36,7 +36,7 @@ pub fn is_operator(c: char) -> bool {
 
 pub fn is_combo_operator(c: char) -> bool {
   match c {
-    '<' | '>' | ':' => true,
+    '<' | '>' | ':' | '|' | '&' => true,
     _ => false,
   }
 }

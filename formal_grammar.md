@@ -30,16 +30,17 @@
 <indirect-y> ::= <op-id> "(" <number> ")" "," "Y"
 
 --------------- EXPRESSIONS -----------------
-<expression> ::= <bool-not-exp> { ("!"|"NOT") <bool-not-exp> }
+<expression> ::= "!"|"NOT" <expression> | <bool-not-exp>
 <bool-not-exp> ::= <bool-or-exp> { ("||"|"OR") <bool-or-exp> }
 <bool-or-exp> ::= <bool-xor-and-exp> { ("&&"|"XOR"|"AND") <bool-xor-and-exp> }
 <bool-xor-and-exp> ::= <relational-exp> { ("="|"<>"|"<"|">"|"<="|">=") <relational-exp> }
 <relational-exp> ::= <binary-add-sub-exp> { ("+"|"-"|"|"|"BITOR") <binary-add-sub-exp> }
-<binary-add-sub-exp> ::= <bitwise-mul-div-exp> { ("_"|"/"|"<<"|">>"|"^"|"&"|"MOD"|"BITAND"|"BITXOR"|"SHL"|"SHR") <bitwise-mul-div-exp> }
-<bitwise-mul-div-exp> ::= <unary-exp> { ("^"|">"|"<"|"~"|"+"|"-"|<built-in-pseudo-variable>|<built-in-pseudo-function>|"BITNOT") <unary-exp> }
+<binary-add-sub-exp> ::= <bitwise-mul-div-exp> { ("\*"|"/"|"<<"|">>"|"^"|"&"|"MOD"|"BITAND"|"BITXOR"|"SHL"|"SHR") <bitwise-mul-div-exp> }
+<bitwise-mul-div-exp> ::= <unary-op> <bitwise-mul-div-exp> | <unary-exp>
 <unary-exp> ::= <factor> { (".CONCAT") <factor> }
 <factor> ::= "(" <expression> ")" | <id> | <number>
-<built-in-pseudo-variable> ::= ("_"|"ASIZE"|"CPU"|"ISIZE"|"PARAMCOUNT"|"TIME"|"VERSION")
+<unary-op> ::= ("^"|">"|"<"|"~"|"+"|"-"|<built-in-pseudo-variable>|<built-in-pseudo-function>|"BITNOT")
+<built-in-pseudo-variable> ::= ("\_"|"ASIZE"|"CPU"|"ISIZE"|"PARAMCOUNT"|"TIME"|"VERSION")
 <built-in-pseudo-function> ::= ("ADDRSIZE"|"BANK"|"BANKBYTE"|"BLANK"|"CONST"|"HIBYTE"|"HIWORD"|"IDENT"|"LEFT"|"LOBYTE"|"LOWORD"|"MATCH"|"MAX"|"MID"|"MIN"|"REF"|"REFERENCED"|"RIGHT"|"SIZEOF"|"STRAT"|"SPRINTF"|"STRING"|"STRLEN"|"TCOUNT"|"XMATCH")
 
 --------------- GENERIC ---------------------
