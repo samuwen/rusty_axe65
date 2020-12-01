@@ -16,9 +16,6 @@ pub fn parse(mut tokens: Vec<Token>) -> Node<String> {
 // <statement> ::= <assignment> | <directive> | <label> | <opcode>
 fn parse_statement(tokens: &mut Vec<Token>) -> Node<String> {
   let next = peek_next_token(tokens);
-  if next.get_line() == &52 {
-    let hi = "hi";
-  }
   if is_opcode(next.get_value()) {
     return parse_opcode(tokens);
   }
