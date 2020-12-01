@@ -19,28 +19,18 @@ pub fn generate(tree: Node<String>) -> Vec<String> {
 fn generate_code(node: &Node<String>, context: &mut Context) {
   match node.get_type() {
     NodeType::AssignmentStatement => {
-      let (name, value) = parse_assignment_statement(node);
-      context.add_var(name, value);
+      parse_assignment_statement(node, context);
     }
     NodeType::DirectiveStatement => {
-      for child in node.get_children() {
-        match child.get_type() {
-          NodeType::DirectiveSegment => {
-            let segment = parse_dir_segment(child);
-            context.change_segments(segment);
-          }
-          NodeType::DirectiveByte => {
-            let dir_args = child
-              .get_children()
-              .get(0)
-              .expect("Byte directive with no dir args");
-            parse_line(dir_args, context);
-          }
-          _ => todo!(),
-        }
-      }
+      parse_directive_statement(node, context);
     }
-    _ => panic!("the disco"),
+    NodeType::LabelStatement => {
+      parse_label_statement(node, context);
+    }
+    NodeType::OpcodeStatement => {
+      parse_opcode_statement(node, context);
+    }
+    _ => panic!("node type not implemented yet {:?}", node.get_type()),
   }
 }
 
@@ -59,6 +49,54 @@ fn parse_line(node: &Node<String>, context: &mut Context) {
   context.add_line(byte_count);
 }
 
+fn parse_directive_statement(node: &Node<String>, context: &mut Context) {
+  for child in node.get_children() {
+    match child.get_type() {
+      NodeType::DirectiveSegment => {
+        let segment = parse_dir_segment(child);
+        context.change_segments(segment);
+      }
+      NodeType::DirectiveByte => {
+        let dir_args = child
+          .get_children()
+          .get(0)
+          .expect("Byte directive with no dir args");
+        parse_line(dir_args, context);
+      }
+      _ => todo!(),
+    }
+  }
+}
+
+fn parse_opcode_statement(node: &Node<String>, context: &mut Context) {
+  let opcode = node
+    .get_children()
+    .get(0)
+    .expect("Opcode statement missing children");
+  let bytes = match opcode.get_type() {
+    NodeType::AccumulatorMode => 1,
+    NodeType::ImmediateMode | NodeType::IndirectXMode | NodeType::IndirectYMode => 2,
+    NodeType::DirectMode => {
+      let child = opcode
+        .get_children()
+        .get(0)
+        .expect("Direct mode opcode missing children");
+      let data = child.get_data().get(0).expect("Direct mode missing data");
+      let num_val = match child.get_type() {
+        NodeType::Variable => context.get_var(data),
+        NodeType::Number => usize::from_str_radix(data, 10).unwrap(),
+        _ => panic!("stuff"),
+      };
+      match num_val > 0xFF {
+        true => 3,
+        false => 2,
+      }
+    }
+    _ => panic!("Unimplemented opcode type {:?}", opcode.get_type()),
+  };
+  context.add_line(bytes);
+}
+
 fn parse_dir_segment(node: &Node<String>) -> Segment {
   let seg_string = node
     .get_data()
@@ -68,7 +106,7 @@ fn parse_dir_segment(node: &Node<String>) -> Segment {
   Segment::new(seg_string).build()
 }
 
-fn parse_assignment_statement(node: &Node<String>) -> (String, usize) {
+fn parse_assignment_statement(node: &Node<String>, context: &mut Context) {
   let var_name = node
     .get_data()
     .get(0)
@@ -81,10 +119,16 @@ fn parse_assignment_statement(node: &Node<String>) -> (String, usize) {
     .get_data()
     .get(0)
     .expect("Assignment statement missing value");
-  (
-    var_name.to_owned(),
-    usize::from_str_radix(&value, 10).unwrap(),
-  )
+  context.add_var(var_name, usize::from_str_radix(&value, 10).unwrap());
+}
+
+fn parse_label_statement(node: &Node<String>, context: &mut Context) {
+  let child = node
+    .get_children()
+    .get(0)
+    .expect("Label statement missing children");
+  let data = child.get_data().get(0).expect("Label missing data");
+  context.add_label(data);
 }
 
 struct Line {
@@ -280,6 +324,7 @@ enum Style {
 
 struct Context {
   var_map: HashMap<String, usize>,
+  reg_label_map: HashMap<String, u16>,
   line_list: Vec<Line>,
   seg_list: Vec<Segment>,
   current_segment: Segment,
@@ -289,14 +334,28 @@ impl Context {
   fn new() -> Context {
     Context {
       var_map: HashMap::new(),
+      reg_label_map: HashMap::new(),
       line_list: vec![],
       seg_list: vec![],
       current_segment: Segment::new(String::from("NULL")).build(),
     }
   }
 
-  fn add_var(&mut self, k: String, v: usize) {
-    self.var_map.insert(k, v);
+  fn add_var(&mut self, k: &String, v: usize) {
+    self.var_map.insert(k.to_owned(), v);
+  }
+
+  fn get_var(&self, k: &String) -> usize {
+    *self
+      .var_map
+      .get(k)
+      .expect("Variable accessed before definition")
+  }
+
+  fn add_label(&mut self, k: &String) {
+    self
+      .reg_label_map
+      .insert(k.to_owned(), self.current_segment.size);
   }
 
   fn change_segments(&mut self, segment: Segment) {
