@@ -4,6 +4,7 @@ mod lexer;
 mod node;
 mod opcode;
 mod parser;
+mod read_ca65_obj_file;
 mod token;
 
 use flexi_logger::{colored_default_format, Duplicate, Logger};
@@ -22,10 +23,11 @@ fn main() {
         .format_for_stdout(colored_default_format)
         .start()
         .unwrap();
-    let file = read_to_string("src/data/build.s").expect("File not found");
-    let tokens = lex_file(&file);
-    let tree = parse_file(tokens);
-    generate_file(tree);
+    read_ca65_obj_file::parse_file(String::from("src/data/example.o"));
+    // let file = read_to_string("src/data/build.s").expect("File not found");
+    // let tokens = lex_file(&file);
+    // let tree = parse_file(tokens);
+    // generate_file(tree);
 }
 
 fn lex_file(file: &String) -> Vec<Token> {
