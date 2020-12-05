@@ -9,7 +9,7 @@ fn line_num() -> usize {
   LINE_COUNTER.load(Ordering::Relaxed)
 }
 
-pub fn lex(file: &String) -> Vec<Token> {
+pub fn lex(file: &String, prune_comments: bool) -> Vec<Token> {
   if &file[file.len() - 1..] != "\n" {
     panic!("File needs to end in a newline");
   }
@@ -21,13 +21,16 @@ pub fn lex(file: &String) -> Vec<Token> {
     out_vec.push(next);
     next = next_token(&mut characters);
   }
+  LINE_COUNTER.store(0, Ordering::Relaxed);
   out_vec.push(next);
   out_vec
     .into_iter()
     .filter(|t| {
-      t.get_type() != &TokenType::Whitespace
-        && t.get_type() != &TokenType::Comment
-        && t.get_type() != &TokenType::Newline
+      let mut wn = t.get_type() != &TokenType::Whitespace && t.get_type() != &TokenType::Newline;
+      if prune_comments {
+        wn = wn && t.get_type() != &TokenType::Comment;
+      }
+      wn
     })
     .collect()
 }
@@ -61,13 +64,7 @@ fn next_token(chars: &mut Characters) -> Token {
     return handle_operator(chars);
   }
   if is_whitespace(next) {
-    return Token::new(
-      empty,
-      TokenType::Whitespace,
-      start,
-      chars.get_index(),
-      line_num(),
-    );
+    return handle_whitespace(chars);
   }
   if is_newline(next) {
     LINE_COUNTER.fetch_add(1, Ordering::Relaxed);
@@ -157,7 +154,7 @@ fn handle_identifier(chars: &mut Characters) -> Token {
     1 => match token_string.as_ref() {
       "X" => TokenType::XRegister,
       "Y" => TokenType::YRegister,
-      _ => panic!("Unknown single char identifier: {}", token_string),
+      _ => TokenType::Identifier,
     },
     _ => match is_opcode(&token_string) {
       true => TokenType::Opcode,
@@ -332,6 +329,23 @@ fn handle_char_constant(chars: &mut Characters, s: usize) -> Token {
     chars.get_index(),
     line_num(),
   )
+}
+
+fn handle_whitespace(chars: &mut Characters) -> Token {
+  let empty = String::from("");
+  let start = chars.get_index();
+  let mut next = chars.peek_next();
+  while is_whitespace(next) {
+    chars.get_next();
+    next = chars.peek_next();
+  }
+  return Token::new(
+    empty,
+    TokenType::Whitespace,
+    start,
+    chars.get_index(),
+    line_num(),
+  );
 }
 
 struct Characters {

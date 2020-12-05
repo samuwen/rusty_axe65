@@ -1,3 +1,4 @@
+use crate::configuration::generate_config_data;
 use crate::node::{Node, NodeType};
 use std::collections::HashMap;
 
@@ -39,7 +40,7 @@ fn handle_label_statement(node: &Node<String>, context: &mut Context) {
 }
 
 fn parse_config_file(config_file: &String) {
-  todo!();
+  let result = generate_config_data(config_file);
 }
 
 struct Context {

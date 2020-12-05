@@ -1,3 +1,4 @@
+use crate::common::*;
 use crate::node::{Node, NodeType};
 use crate::opcode::*;
 use crate::token::{Token, TokenType};
@@ -334,12 +335,7 @@ fn parse_ulabel(tokens: &mut Vec<Token>) -> Node<String> {
 // Take hex/bin/dec number and return it without control chars as decimal number
 fn parse_number(tokens: &mut Vec<Token>) -> Node<String> {
   let token = get_next_token(tokens);
-  let num = match token.get_type() {
-    TokenType::HexNumber => u16::from_str_radix(&token.get_value()[1..], 16),
-    TokenType::BinNumber => u16::from_str_radix(&token.get_value()[1..], 2),
-    TokenType::DecNumber => u16::from_str_radix(&token.get_value(), 10),
-    _ => error(&token),
-  };
+  let num = convert_number(&token);
   match num {
     Ok(val) => {
       let mut node = Node::new(NodeType::Number);
@@ -392,42 +388,4 @@ fn parse_generic_un_exp<
     }
     false => final_exp(tokens),
   }
-}
-
-fn get_next_token_checked(tokens: &mut Vec<Token>, expected: Vec<TokenType>) -> Token {
-  let token = get_next_token(tokens);
-  let valid = expected.iter().any(|t| token.get_type() == t);
-  if !valid {
-    error(&token);
-  }
-  token
-}
-
-fn get_next_token(tokens: &mut Vec<Token>) -> Token {
-  tokens.remove(0)
-}
-
-fn peek_next_token(tokens: &Vec<Token>) -> Token {
-  peek(tokens, 0)
-}
-
-fn peek_two_ahead(tokens: &Vec<Token>) -> Token {
-  peek(tokens, 1)
-}
-
-fn peek(tokens: &Vec<Token>, count: usize) -> Token {
-  let option = tokens.get(count);
-  match option {
-    Some(token) => token.clone(),
-    None => Token::new(String::from(""), TokenType::EndOfFile, 0, 0, 0),
-  }
-}
-
-fn error(token: &Token) -> ! {
-  panic!(
-    "Invalid token.\nToken Type: {:?}\nToken Value: {}\nLine Number: {}",
-    token.get_type(),
-    token.get_value(),
-    token.get_line()
-  );
 }

@@ -1,4 +1,5 @@
 mod char_helper;
+mod common;
 mod configuration;
 mod generator;
 mod lexer;
@@ -7,6 +8,7 @@ mod opcode;
 mod parser;
 mod token;
 
+use common::*;
 use configuration::*;
 use flexi_logger::{colored_default_format, Duplicate, Logger};
 use generator::generate;
@@ -24,8 +26,8 @@ fn main() {
         .format_for_stdout(colored_default_format)
         .start()
         .unwrap();
-    let input_file = read_to_string("src/data/example.s").expect("File not found");
-    let config_file = read_to_string("src/data/examle.cfg").expect("File not found");
+    let input_file = read_to_string("src/data/build.s").expect("File not found");
+    let config_file = read_to_string("src/data/example.cfg").expect("File not found");
     let tokens = lex_file(&input_file);
     let tree = parse_file(tokens);
     generate_file(tree, &config_file);
@@ -33,7 +35,7 @@ fn main() {
 
 fn lex_file(file: &String) -> Vec<Token> {
     let lex_start = Instant::now();
-    let tokens = lex(file);
+    let tokens = lex(file, true);
     let lex_end = Instant::now();
     log_time("Lexing", lex_end - lex_start);
     let to_file = tokens.clone();

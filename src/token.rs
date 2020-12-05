@@ -216,7 +216,7 @@ pub enum TokenType {
   HexNumber,
   BinNumber,
   DecNumber,
-  Label,
+  Semicolon,
   DirectiveA16,
   DirectiveA8,
   DirectiveAddr,
