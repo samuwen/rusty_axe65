@@ -17,22 +17,20 @@ impl<T> Node<T> {
     }
   }
 
-  pub fn new_with_child(node_type: NodeType, child: Node<T>) -> Node<T> {
-    let mut node = Node {
-      n_type: node_type,
-      data: vec![],
-      children: vec![],
-    };
-    node.add_child(child);
-    node
-  }
-
   pub fn add_child(&mut self, child: Node<T>) {
     self.children.push(child)
   }
 
   pub fn get_data(&self) -> &Vec<T> {
     &self.data
+  }
+
+  pub fn get_first_data_result(&self) -> &T {
+    &self.data.get(0).expect("No data found in node")
+  }
+
+  pub fn get_first_child(&self) -> &Node<T> {
+    &self.children.get(0).expect("No children found in node")
   }
 
   pub fn get_type(&self) -> &NodeType {

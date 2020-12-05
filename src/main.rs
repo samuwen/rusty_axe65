@@ -1,12 +1,13 @@
 mod char_helper;
+mod configuration;
 mod generator;
 mod lexer;
 mod node;
 mod opcode;
 mod parser;
-mod read_ca65_obj_file;
 mod token;
 
+use configuration::*;
 use flexi_logger::{colored_default_format, Duplicate, Logger};
 use generator::generate;
 use lexer::lex;
@@ -23,11 +24,11 @@ fn main() {
         .format_for_stdout(colored_default_format)
         .start()
         .unwrap();
-    read_ca65_obj_file::parse_file(String::from("src/data/example.o"));
-    // let file = read_to_string("src/data/build.s").expect("File not found");
-    // let tokens = lex_file(&file);
-    // let tree = parse_file(tokens);
-    // generate_file(tree);
+    let input_file = read_to_string("src/data/example.s").expect("File not found");
+    let config_file = read_to_string("src/data/examle.cfg").expect("File not found");
+    let tokens = lex_file(&input_file);
+    let tree = parse_file(tokens);
+    generate_file(tree, &config_file);
 }
 
 fn lex_file(file: &String) -> Vec<Token> {
@@ -52,9 +53,9 @@ fn parse_file(tokens: Vec<Token>) -> Node<String> {
     tree
 }
 
-fn generate_file(tree: Node<String>) {
+fn generate_file(tree: Node<String>, config_file: &String) {
     let generate_start = Instant::now();
-    let generated = generate(tree);
+    let generated = generate(tree, &config_file);
     let generate_end = Instant::now();
     log_time("Generation", generate_end - generate_start);
     write("src/out/generated.out", generated.join("\n")).unwrap();
