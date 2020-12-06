@@ -1,32 +1,34 @@
 use crate::common::*;
 use crate::lexer::lex;
 use crate::token::{Token, TokenType};
-use std::convert::TryInto;
 use std::fs::write;
 
-pub fn generate_config_data(config_file: &String) {
+pub fn generate_config_data(config_file: &String) -> Configuration {
   let mut tokens = lex(config_file, false);
   let to_file = tokens.clone();
   let out: Vec<String> = to_file.iter().map(|t| format!("{}", t)).collect();
   write("src/out/config_lexed.out", out.join("\n")).unwrap();
-  parse_config_file(&mut tokens);
+  parse_config_file(&mut tokens)
 }
 
-fn parse_config_file(tokens: &mut Vec<Token>) {
-  let token = get_next_token_checked(tokens, vec![TokenType::Identifier]);
-  match token.get_value().to_ascii_uppercase().as_ref() {
-    "MEMORY" => parse_memory_section(tokens),
-    "SEGMENTS" => parse_segment_section(tokens),
-    "SYMBOLS" => parse_symbol_section(tokens),
-    "FEATURES" => parse_feature_section(tokens),
-    _ => panic!(
-      "Unrecognized configuration parameter: {}",
-      token.get_value()
-    ),
+fn parse_config_file(tokens: &mut Vec<Token>) -> Configuration {
+  let mut config = Configuration::new();
+  let mut next = peek_next_token(tokens);
+  while next.get_type() != &TokenType::EndOfFile {
+    config = match next.get_value().to_ascii_uppercase().as_ref() {
+      "MEMORY" => parse_memory_section(tokens, config),
+      "SEGMENTS" => parse_segment_section(tokens, config),
+      "SYMBOLS" => parse_symbol_section(tokens, config),
+      "FEATURES" => parse_feature_section(tokens, config),
+      _ => panic!("Unrecognized configuration parameter: {}", next.get_value()),
+    };
+    next = peek_next_token(tokens);
   }
+  config.build()
 }
 
-fn parse_memory_section(tokens: &mut Vec<Token>) {
+fn parse_memory_section(tokens: &mut Vec<Token>, config: ConfigBuilder) -> ConfigBuilder {
+  get_next_token_checked(tokens, vec![TokenType::Identifier]);
   let mut memory = Memory::new();
   get_next_token_checked(tokens, vec![TokenType::OCurly]);
   let mut next = peek_next_token(tokens);
@@ -35,6 +37,7 @@ fn parse_memory_section(tokens: &mut Vec<Token>) {
     next = peek_next_token(tokens);
   }
   get_next_token_checked(tokens, vec![TokenType::CCurly]);
+  config.memory(memory)
 }
 
 fn parse_memory_entry(tokens: &mut Vec<Token>, memory: &mut Memory) {
@@ -72,27 +75,9 @@ fn parse_mem_attributes(
     ],
   );
   match attr_name.get_value().as_ref() {
-    "start" => {
-      let num = convert_number(&value);
-      match num {
-        Ok(v) => mem_entry.start(v),
-        Err(_) => error(&value),
-      }
-    }
-    "size" => {
-      let num = convert_number(&value);
-      match num {
-        Ok(v) => mem_entry.size(v),
-        Err(_) => error(&value),
-      }
-    }
-    "fillval" => {
-      let num = convert_number(&value);
-      match num {
-        Ok(v) => mem_entry.fill_val(v.try_into().expect("Invalid value for fillval")),
-        Err(_) => error(&value),
-      }
-    }
+    "start" => add_number(value, MemoryEntryBuilder::start, mem_entry),
+    "size" => add_number(value, MemoryEntryBuilder::size, mem_entry),
+    "fillval" => add_u8(value, MemoryEntryBuilder::fill_val, mem_entry),
     "type" => mem_entry.mem_type(MemType::from_string(value.get_value())),
     "file" => match value.get_type() {
       TokenType::StringConst => mem_entry.file(value.get_value()),
@@ -102,48 +87,139 @@ fn parse_mem_attributes(
       }
       _ => panic!("Invalid memory file type {:?}", value.get_type()),
     },
-    "define" => match value.get_type() == &TokenType::Identifier {
-      true => mem_entry.define(match value.get_value().as_str() {
-        "yes" => true,
-        "no" => false,
-        _ => panic!("Invalid memory define instruction {}", value.get_value()),
-      }),
-      false => panic!("Invalid memory define type {:?}", value.get_type()),
-    },
-    "fill" => match value.get_type() == &TokenType::Identifier {
-      true => mem_entry.fill(match value.get_value().as_str() {
-        "yes" => true,
-        "no" => false,
-        _ => panic!("Invalid memory fill instruction {}", value.get_value()),
-      }),
-      false => panic!("Invalid memory fill type {:?}", value.get_type()),
-    },
+    "define" => add_bool(value, MemoryEntryBuilder::define, mem_entry),
+    "fill" => add_bool(value, MemoryEntryBuilder::fill, mem_entry),
     _ => panic!("the disco"),
   }
 }
 
-fn parse_segment_section(tokens: &mut Vec<Token>) {
-  let mut memory = Memory::new();
+fn parse_segment_section(tokens: &mut Vec<Token>, config: ConfigBuilder) -> ConfigBuilder {
+  get_next_token_checked(tokens, vec![TokenType::Identifier]);
+  let mut segment = Segment::new();
   get_next_token_checked(tokens, vec![TokenType::OCurly]);
   let mut next = peek_next_token(tokens);
   while next.get_type() != &TokenType::CCurly {
-    parse_memory_entry(tokens, &mut memory);
+    parse_segment_entry(tokens, &mut segment);
     next = peek_next_token(tokens);
   }
   get_next_token_checked(tokens, vec![TokenType::CCurly]);
+  config.segments(segment)
 }
 
-fn parse_symbol_section(tokens: &mut Vec<Token>) {
+fn parse_segment_entry(tokens: &mut Vec<Token>, segment: &mut Segment) {
+  let id = get_next_token_checked(tokens, vec![TokenType::Identifier]);
+  let mut segment_entry = SegmentEntry::new(id.get_value());
+  get_next_token_checked(tokens, vec![TokenType::Colon]);
+  let mut next = peek_next_token(tokens);
+  while next.get_type() != &TokenType::Comment {
+    segment_entry = parse_seg_attributes(tokens, segment_entry);
+    next = peek_next_token(tokens);
+    if next.get_type() == &TokenType::Comma {
+      get_next_token(tokens);
+      next = peek_next_token(tokens);
+    }
+  }
+  get_next_token_checked(tokens, vec![TokenType::Comment]);
+  segment.add_entry(segment_entry.build());
+}
+
+fn parse_seg_attributes(
+  tokens: &mut Vec<Token>,
+  seg_entry: SegmentEntryBuilder,
+) -> SegmentEntryBuilder {
+  let attr_name = get_next_token_checked(tokens, vec![TokenType::Identifier]);
+  get_next_token_checked(tokens, vec![TokenType::Equal]);
+  let value = get_next_token_checked(
+    tokens,
+    vec![
+      TokenType::String,
+      TokenType::HexNumber,
+      TokenType::BinNumber,
+      TokenType::DecNumber,
+      TokenType::Identifier,
+      TokenType::StringConst,
+    ],
+  );
+  match attr_name.get_value().as_ref() {
+    "load" => seg_entry.load(value.get_value()),
+    "type" => seg_entry.seg_type(SegType::from_str(value.get_value())),
+    "define" => add_bool(value, SegmentEntryBuilder::define, seg_entry),
+    "align" => add_number(value, SegmentEntryBuilder::align, seg_entry),
+    "start" => add_number(value, SegmentEntryBuilder::start, seg_entry),
+    "run" => seg_entry.run(value.get_value()),
+    "offset" => add_number(value, SegmentEntryBuilder::start, seg_entry),
+    "fillval" => add_u8(value, SegmentEntryBuilder::fill_val, seg_entry),
+    _ => panic!("Invalid attribute name {}", attr_name.get_value()),
+  }
+}
+
+fn parse_symbol_section(_tokens: &mut Vec<Token>, _config: ConfigBuilder) -> ConfigBuilder {
   todo!();
 }
 
-fn parse_feature_section(tokens: &mut Vec<Token>) {
+fn parse_feature_section(_tokens: &mut Vec<Token>, _config: ConfigBuilder) -> ConfigBuilder {
   todo!();
+}
+
+pub struct Configuration {
+  memory: Memory,
+  segments: Segment,
+  _symbols: Option<bool>,  // NYI
+  _features: Option<bool>, // NYI
+}
+
+impl Configuration {
+  fn new() -> ConfigBuilder {
+    ConfigBuilder {
+      memory: None,
+      segments: None,
+      _symbols: None,
+      _features: None,
+    }
+  }
+}
+
+struct ConfigBuilder {
+  memory: Option<Memory>,
+  segments: Option<Segment>,
+  _symbols: Option<bool>,  // NYI
+  _features: Option<bool>, // NYI
+}
+
+impl ConfigBuilder {
+  fn memory(mut self, memory: Memory) -> Self {
+    self.memory = Some(memory);
+    self
+  }
+
+  fn segments(mut self, segments: Segment) -> Self {
+    self.segments = Some(segments);
+    self
+  }
+
+  fn build(self) -> Configuration {
+    let memory = match self.memory {
+      Some(mem) => mem,
+      None => panic!("No memory configuration specified"),
+    };
+    let segments = match self.segments {
+      Some(seg) => seg,
+      None => panic!("No segment configuration specified"),
+    };
+    Configuration {
+      memory,
+      segments,
+      _symbols: None,
+      _features: None,
+    }
+  }
 }
 
 struct Memory {
   entries: Vec<MemoryEntry>,
 }
+
+impl ConfigSection for Memory {}
 
 impl Memory {
   fn new() -> Memory {
@@ -166,12 +242,14 @@ struct MemoryEntry {
   fill_val: Option<u8>,
 }
 
+impl ConfigEntry for MemoryEntry {}
+
 impl MemoryEntry {
   fn new(name: &String) -> MemoryEntryBuilder {
     MemoryEntryBuilder {
       name: name.to_owned(),
-      start: u16::MAX,
-      size: u16::MAX,
+      start: None,
+      size: None,
       mem_type: None,
       file: None,
       define: None,
@@ -183,8 +261,8 @@ impl MemoryEntry {
 
 struct MemoryEntryBuilder {
   name: String,
-  start: u16,
-  size: u16,
+  start: Option<u16>,
+  size: Option<u16>,
   mem_type: Option<MemType>,
   file: Option<String>,
   define: Option<bool>,
@@ -192,14 +270,16 @@ struct MemoryEntryBuilder {
   fill_val: Option<u8>,
 }
 
+impl ConfigEntryBuilder for MemoryEntryBuilder {}
+
 impl MemoryEntryBuilder {
   fn start(mut self, start: u16) -> Self {
-    self.start = start;
+    self.start = Some(start);
     self
   }
 
   fn size(mut self, size: u16) -> Self {
-    self.size = size;
+    self.size = Some(size);
     self
   }
 
@@ -229,16 +309,18 @@ impl MemoryEntryBuilder {
   }
 
   fn build(self) -> MemoryEntry {
-    if self.start == u16::MAX {
-      panic!("Memory entry {} does not have start attribute", self.name);
-    }
-    if self.size == u16::MAX {
-      panic!("Memory entry {} does not have size attribute", self.name);
-    }
+    let start = match self.start {
+      Some(st) => st,
+      None => panic!("Memory entry {} does not have start attribute", self.name),
+    };
+    let size = match self.size {
+      Some(st) => st,
+      None => panic!("Memory entry {} does not have size attribute", self.name),
+    };
     MemoryEntry {
       name: self.name,
-      start: self.start,
-      size: self.size,
+      start: start,
+      size: size,
       mem_type: self.mem_type,
       file: self.file,
       define: self.define,
@@ -267,13 +349,20 @@ struct Segment {
   entries: Vec<SegmentEntry>,
 }
 
+impl ConfigSection for Segment {}
+
 impl Segment {
   fn new() -> Segment {
     Segment { entries: vec![] }
   }
+
+  fn add_entry(&mut self, entry: SegmentEntry) {
+    self.entries.push(entry);
+  }
 }
 
 struct SegmentEntry {
+  name: String,
   load: String,
   seg_type: SegType,
   define: Option<bool>,
@@ -285,6 +374,110 @@ struct SegmentEntry {
   align_load: Option<u16>,
 }
 
+impl ConfigEntry for SegmentEntry {}
+
+impl SegmentEntry {
+  fn new(name: &String) -> SegmentEntryBuilder {
+    SegmentEntryBuilder {
+      name: name.to_owned(),
+      load: None,
+      seg_type: None,
+      define: None,
+      align: None,
+      start: None,
+      run: None,
+      offset: None,
+      fill_val: None,
+      align_load: None,
+    }
+  }
+}
+
+struct SegmentEntryBuilder {
+  name: String,
+  load: Option<String>,
+  seg_type: Option<SegType>,
+  define: Option<bool>,
+  align: Option<u16>,
+  start: Option<u16>,
+  run: Option<String>,
+  offset: Option<u16>,
+  fill_val: Option<u8>,
+  align_load: Option<u16>,
+}
+
+impl ConfigEntryBuilder for SegmentEntryBuilder {}
+
+impl SegmentEntryBuilder {
+  fn load(mut self, load: &String) -> SegmentEntryBuilder {
+    self.load = Some(load.to_owned());
+    self
+  }
+
+  fn seg_type(mut self, seg_type: SegType) -> SegmentEntryBuilder {
+    self.seg_type = Some(seg_type);
+    self
+  }
+
+  fn define(mut self, define: bool) -> SegmentEntryBuilder {
+    self.define = Some(define);
+    self
+  }
+
+  fn align(mut self, align: u16) -> SegmentEntryBuilder {
+    self.align = Some(align);
+    self
+  }
+
+  fn start(mut self, start: u16) -> SegmentEntryBuilder {
+    self.start = Some(start);
+    self
+  }
+
+  fn run(mut self, run: &String) -> SegmentEntryBuilder {
+    self.run = Some(run.to_owned());
+    self
+  }
+
+  fn offset(mut self, offset: u16) -> SegmentEntryBuilder {
+    self.offset = Some(offset);
+    self
+  }
+
+  fn fill_val(mut self, fill_val: u8) -> SegmentEntryBuilder {
+    self.fill_val = Some(fill_val);
+    self
+  }
+
+  fn align_load(mut self, align_load: u16) -> SegmentEntryBuilder {
+    self.align_load = Some(align_load);
+    self
+  }
+
+  fn build(self) -> SegmentEntry {
+    let load = match self.load {
+      Some(l) => l,
+      None => panic!("Segment entry missing load parameter"),
+    };
+    let seg_type = match self.seg_type {
+      Some(s) => s,
+      None => panic!("Segment entry missing type parameter"),
+    };
+    SegmentEntry {
+      name: self.name,
+      load: load,
+      seg_type: seg_type,
+      define: self.define,
+      align: self.align,
+      start: self.start,
+      run: self.run,
+      offset: self.offset,
+      fill_val: self.fill_val,
+      align_load: self.align_load,
+    }
+  }
+}
+
 enum SegType {
   Ro,
   Rw,
@@ -292,3 +485,50 @@ enum SegType {
   Zp,
   Overwrite,
 }
+
+impl SegType {
+  fn from_str(value: &String) -> SegType {
+    match value.to_ascii_lowercase().as_ref() {
+      "ro" => SegType::Ro,
+      "rw" => SegType::Rw,
+      "bss" => SegType::Bss,
+      "zp" => SegType::Zp,
+      "overwrite" => SegType::Overwrite,
+      _ => panic!("Invalid segment type: {}", value),
+    }
+  }
+}
+
+fn add_number<T: ConfigEntryBuilder>(value: Token, f: fn(T, u16) -> T, entry: T) -> T {
+  let num = convert_number(&value);
+  match num {
+    Ok(v) => f(entry, v),
+    Err(_) => error(&value),
+  }
+}
+
+fn add_u8<T: ConfigEntryBuilder>(value: Token, f: fn(T, u8) -> T, entry: T) -> T {
+  let num = convert_number(&value);
+  match num {
+    Ok(v) => f(entry, v as u8),
+    Err(_) => error(&value),
+  }
+}
+
+fn add_bool<T: ConfigEntryBuilder>(value: Token, f: fn(T, bool) -> T, entry: T) -> T {
+  match value.get_type() == &TokenType::Identifier {
+    true => f(
+      entry,
+      match value.get_value().as_str() {
+        "yes" => true,
+        "no" => false,
+        _ => panic!("Invalid boolean instruction {}", value.get_value()),
+      },
+    ),
+    false => panic!("Invalid boolean type {:?}", value.get_type()),
+  }
+}
+
+trait ConfigSection {}
+trait ConfigEntry {}
+trait ConfigEntryBuilder {}

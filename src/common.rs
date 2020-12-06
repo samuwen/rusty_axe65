@@ -21,7 +21,7 @@ pub fn peek_two_ahead(tokens: &Vec<Token>) -> Token {
   peek(tokens, 1)
 }
 
-pub fn peek(tokens: &Vec<Token>, count: usize) -> Token {
+fn peek(tokens: &Vec<Token>, count: usize) -> Token {
   let option = tokens.get(count);
   match option {
     Some(token) => token.clone(),
