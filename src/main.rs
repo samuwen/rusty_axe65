@@ -1,6 +1,6 @@
 mod char_helper;
 mod common;
-// mod configuration;
+mod configuration;
 mod generator;
 mod lexer;
 mod node;
@@ -9,7 +9,7 @@ mod parser;
 mod token;
 
 use common::*;
-// use configuration::*;
+use configuration::*;
 use flexi_logger::{colored_default_format, Duplicate, Logger};
 use generator::generate;
 use lexer::lex;

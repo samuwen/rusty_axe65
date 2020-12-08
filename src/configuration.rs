@@ -177,6 +177,10 @@ impl Configuration {
       _features: None,
     }
   }
+
+  pub fn find_segment_by_name(&self, name: &String) -> Option<&SegmentEntry> {
+    self.segments.find_segment_by_name(name)
+  }
 }
 
 struct ConfigBuilder {
@@ -359,9 +363,16 @@ impl Segment {
   fn add_entry(&mut self, entry: SegmentEntry) {
     self.entries.push(entry);
   }
+
+  fn find_segment_by_name(&self, name: &String) -> Option<&SegmentEntry> {
+    self
+      .entries
+      .iter()
+      .find(|e| e.name.to_ascii_uppercase() == name.to_ascii_uppercase())
+  }
 }
 
-struct SegmentEntry {
+pub struct SegmentEntry {
   name: String,
   load: String,
   seg_type: SegType,
@@ -390,6 +401,10 @@ impl SegmentEntry {
       fill_val: None,
       align_load: None,
     }
+  }
+
+  pub fn get_type(&self) -> &SegType {
+    &self.seg_type
   }
 }
 
@@ -478,7 +493,7 @@ impl SegmentEntryBuilder {
   }
 }
 
-enum SegType {
+pub enum SegType {
   Ro,
   Rw,
   Bss,

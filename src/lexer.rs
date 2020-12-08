@@ -172,29 +172,29 @@ fn handle_operator(chars: &mut Characters) -> Token {
   match is_combo_operator(current) {
     true => match current {
       '<' => match next {
-        '<' => handle_combo_operator("<<", TokenType::Shl, start, end),
-        '>' => handle_combo_operator("<>", TokenType::NotEqual, start, end),
-        '=' => handle_combo_operator("<=", TokenType::LessThanOrEqual, start, end),
+        '<' => handle_combo_operator("<<", TokenType::Shl, start, end, chars),
+        '>' => handle_combo_operator("<>", TokenType::NotEqual, start, end, chars),
+        '=' => handle_combo_operator("<=", TokenType::LessThanOrEqual, start, end, chars),
         _ => handle_single_operator(current, TokenType::LessThan, start, end),
       },
       '>' => match next {
-        '>' => handle_combo_operator(">>", TokenType::Shr, start, end),
-        '=' => handle_combo_operator(">=", TokenType::GreaterThanOrEqual, start, end),
+        '>' => handle_combo_operator(">>", TokenType::Shr, start, end, chars),
+        '=' => handle_combo_operator(">=", TokenType::GreaterThanOrEqual, start, end, chars),
         _ => handle_single_operator(current, TokenType::GreaterThan, start, end),
       },
       ':' => match next {
-        ':' => handle_combo_operator("::", TokenType::Namespace, start, end),
-        '=' => handle_combo_operator(":=", TokenType::Assignment, start, end),
+        ':' => handle_combo_operator("::", TokenType::Namespace, start, end, chars),
+        '=' => handle_combo_operator(":=", TokenType::Assignment, start, end, chars),
         '+' => handle_unnamed_label(TokenType::ULabel, start, end, chars, '+'),
         '-' => handle_unnamed_label(TokenType::ULabel, start, end, chars, '-'),
         _ => handle_single_operator(current, TokenType::Colon, start, end),
       },
       '|' => match next {
-        '|' => handle_combo_operator("||", TokenType::BoolOr, start, end),
+        '|' => handle_combo_operator("||", TokenType::BoolOr, start, end, chars),
         _ => handle_single_operator(current, TokenType::Or, start, end),
       },
       '&' => match next {
-        '&' => handle_combo_operator("&&", TokenType::BoolAnd, start, end),
+        '&' => handle_combo_operator("&&", TokenType::BoolAnd, start, end, chars),
         _ => handle_single_operator(current, TokenType::And, start, end),
       },
       _ => panic!("Not yet implemented {}", current),
@@ -250,7 +250,14 @@ fn handle_single_operator(c: char, t: TokenType, s: usize, e: usize) -> Token {
   Token::new(String::from(c), t, s, e, line_num())
 }
 
-fn handle_combo_operator(c: &str, t: TokenType, s: usize, e: usize) -> Token {
+fn handle_combo_operator(
+  c: &str,
+  t: TokenType,
+  s: usize,
+  e: usize,
+  chars: &mut Characters,
+) -> Token {
+  chars.get_next(); // discard the second operator
   Token::new(String::from(c), t, s, e, line_num())
 }
 
