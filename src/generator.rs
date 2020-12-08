@@ -54,7 +54,8 @@ fn create_size_map(tree: &Node<String>, context: &mut Context) {
       NodeType::DirectiveStatement => handle_directive_statement(child, context),
       NodeType::LabelStatement => handle_label_statement(child, context),
       NodeType::OpcodeStatement => handle_opcode_statement(child, context),
-      _ => (),
+      NodeType::AssignmentStatement => (),
+      _ => panic!("Invalid statement type {:?}", child.get_type()),
     }
   }
 }
@@ -81,6 +82,7 @@ fn handle_opcode_statement(node: &Node<String>, context: &mut Context) {
     match child.get_type() {
       NodeType::AccumulatorMode => handle_accumulator_mode(child, context),
       NodeType::ImmediateMode => handle_immediate_mode(child, context),
+      NodeType::DirectMode => handle_direct_mode(child, context),
       _ => (),
     }
   }
@@ -95,12 +97,12 @@ fn handle_byte_directive(node: &Node<String>, context: &mut Context) {
           let data = arg.get_first_data_result();
           data
             .chars()
-            .for_each(|c| context.add_byte_to_current_segment(c as u8));
+            .for_each(|c| context.add_value_to_current_segment(c as u8));
         }
         NodeType::Number => {
           // we know this is a 1 byte number
           let num = get_bytes_from_number_node(arg);
-          context.add_byte_to_current_segment(num[0]);
+          context.add_value_to_current_segment(num[0]);
         }
         _ => panic!("nyi"),
       }
@@ -111,24 +113,66 @@ fn handle_byte_directive(node: &Node<String>, context: &mut Context) {
 fn handle_accumulator_mode(node: &Node<String>, context: &mut Context) {
   let opcode_name = node.get_first_data_result();
   let opcode = get_accumulator(opcode_name);
-  context.add_byte_to_current_segment(opcode);
+  context.add_value_to_current_segment(opcode);
 }
 
 fn handle_immediate_mode(node: &Node<String>, context: &mut Context) {
   let opcode_name = node.get_first_data_result();
   let opcode = get_immediate(opcode_name);
-  context.add_byte_to_current_segment(opcode);
+  context.add_value_to_current_segment(opcode);
   let operand_node = node.get_first_child();
-  let bytes = match operand_node.get_type() {
-    NodeType::Number => get_bytes_from_number_node(operand_node),
+  match operand_node.get_type() {
+    NodeType::Number => {
+      // we know this is a 1 byte number
+      let bytes = get_bytes_from_number_node(operand_node);
+      context.add_value_to_current_segment(bytes[0]);
+    }
     NodeType::Variable => {
       let variable = operand_node.get_first_data_result();
-      let num = context.get_var(variable);
-      num.to_le_bytes()
+      context.handle_variable(variable);
     }
-    _ => panic!("Invalid child node for immediate mode");
-  };
-  context.add_byte_to_current_segment(bytes[0]);
+    NodeType::UnaryOp => {
+      let variable = operand_node.get_first_child();
+      match operand_node.get_first_data_result().as_str() {
+        _ => panic!("Not sure what to do here"),
+      }
+    }
+    _ => panic!(
+      "Invalid child node for immediate mode {:?}",
+      operand_node.get_type()
+    ),
+  }
+}
+
+fn handle_direct_mode(node: &Node<String>, context: &mut Context) {
+  let opcode_name = node.get_first_data_result();
+  let operand_node = node.get_first_child();
+  match operand_node.get_type() {
+    NodeType::Number => {
+      let bytes = get_bytes_from_number_node(operand_node);
+      match bytes[1] > 0 {
+        true => {
+          let opcode = get_absolute(opcode_name);
+          context.add_value_to_current_segment(opcode);
+          context.add_value_to_current_segment(bytes[0]);
+          context.add_value_to_current_segment(bytes[1]);
+        }
+        false => {
+          let opcode = get_zero_page(opcode_name);
+          context.add_value_to_current_segment(opcode);
+          context.add_value_to_current_segment(bytes[0]);
+        }
+      }
+    }
+    NodeType::Variable => {
+      let variable = operand_node.get_first_data_result();
+      context.handle_variable(variable);
+    }
+    _ => panic!(
+      "Invalid child for direct mode {:?}",
+      operand_node.get_type()
+    ),
+  }
 }
 
 fn get_bytes_from_number_node(node: &Node<String>) -> [u8; 2] {
@@ -162,8 +206,34 @@ impl Context {
     self.var_map.insert(k.to_owned(), v);
   }
 
-  fn get_var(&self, k: &String) -> u16 {
-    *self.var_map.get(k).unwrap()
+  fn get_var(&self, k: &String) -> Option<&u16> {
+    self.var_map.get(k)
+  }
+
+  fn get_label(&mut self, k: &String) -> Option<&mut Label> {
+    self.label_map.get_mut(k)
+  }
+
+  fn handle_variable(&mut self, k: &String) {
+    let var_opt = self.get_var(k);
+    match var_opt {
+      Some(num) => {
+        let bytes = num.to_le_bytes();
+        match num > &0xFF {
+          true => {
+            self.add_value_to_current_segment(bytes[0]);
+            self.add_value_to_current_segment(bytes[1]);
+          }
+          false => {
+            self.add_value_to_current_segment(bytes[0]);
+          }
+        }
+      }
+      None => {
+        let label = self.get_label(k).unwrap().clone();
+        self.get_current_segment().add_label(label.clone());
+      }
+    }
   }
 
   fn add_label_to_map(&mut self, k: &String) {
@@ -200,9 +270,9 @@ impl Context {
     self.get_current_segment().get_offset()
   }
 
-  fn add_byte_to_current_segment(&mut self, byte: u8) {
+  fn add_value_to_current_segment(&mut self, byte: u8) {
     let seg = self.get_current_segment();
-    seg.add_byte(byte);
+    seg.add_value(byte);
   }
 
   fn add_offset_to_label(&mut self, label_name: &String) {
@@ -212,6 +282,7 @@ impl Context {
   }
 }
 
+#[derive(Clone)]
 struct Label {
   segment_id: u8,
   offset_from_seg_start: u16,
@@ -228,15 +299,17 @@ impl Label {
   fn add_offset(&mut self, offset: u16) {
     self.offset_from_seg_start = offset;
   }
+
+  fn get_offset(&self) -> u16 {
+    self.offset_from_seg_start
+  }
 }
 
 struct Segment {
   id: u8,
   name: String,
-  read_write: ReadWrite,
-  address_mode: AddressMode,
   current_offset: u16,
-  bytes: Vec<Option<u8>>,
+  values: Vec<Storage>,
 }
 
 impl Segment {
@@ -244,19 +317,18 @@ impl Segment {
     Segment {
       id,
       name: name.to_owned(),
-      read_write: ReadWrite::Ro,
-      address_mode: AddressMode::Absolute,
       current_offset: 0,
-      bytes: vec![],
+      values: vec![],
     }
   }
 
-  fn add_byte(&mut self, byte: u8) {
-    self.bytes.push(Some(byte));
+  fn add_value(&mut self, byte: u8) {
+    self.current_offset += 1;
+    self.values.push(Storage::new_value(byte));
   }
 
-  fn add_bytes(&mut self, bytes: &mut Vec<u8>) {
-    bytes.iter().for_each(|b| self.bytes.push(Some(*b)));
+  fn add_label(&mut self, label: Label) {
+    self.values.push(Storage::new_label(label));
   }
 
   fn get_offset(&self) -> u16 {
@@ -271,12 +343,23 @@ impl PartialEq for Segment {
   }
 }
 
-enum ReadWrite {
-  Ro,
-  Rw,
+struct Storage {
+  value: Option<u8>,
+  label: Option<Label>,
 }
 
-enum AddressMode {
-  Absolute,
-  Zeropage,
+impl Storage {
+  fn new_value(value: u8) -> Storage {
+    Storage {
+      value: Some(value),
+      label: None,
+    }
+  }
+
+  fn new_label(label: Label) -> Storage {
+    Storage {
+      value: None,
+      label: Some(label),
+    }
+  }
 }

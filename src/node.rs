@@ -21,10 +21,6 @@ impl<T> Node<T> {
     self.children.push(child)
   }
 
-  pub fn get_data(&self) -> &Vec<T> {
-    &self.data
-  }
-
   pub fn get_first_data_result(&self) -> &T {
     &self.data.get(0).expect("No data found in node")
   }

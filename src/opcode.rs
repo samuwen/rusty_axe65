@@ -72,7 +72,7 @@ pub fn get_immediate(code: &str) -> u8 {
   }
 }
 
-pub fn _get_absolute(code: &str) -> u8 {
+pub fn get_absolute(code: &str) -> u8 {
   match code.to_ascii_lowercase().as_str() {
     "adc" => 0x6D,
     "and" => 0x2D,
@@ -137,7 +137,7 @@ pub fn _get_absolute_y(code: &str) -> u8 {
   }
 }
 
-pub fn _get_zero_page(code: &str) -> u8 {
+pub fn get_zero_page(code: &str) -> u8 {
   match code.to_ascii_lowercase().as_str() {
     "adc" => 0x65,
     "and" => 0x25,

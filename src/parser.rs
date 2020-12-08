@@ -342,7 +342,7 @@ fn parse_number(tokens: &mut Vec<Token>) -> Node<String> {
       node.add_data(&val.to_string());
       node
     }
-    Err(e) => error(&token),
+    Err(_) => error(&token),
   }
 }
 
