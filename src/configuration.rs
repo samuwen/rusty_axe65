@@ -181,6 +181,21 @@ impl Configuration {
   pub fn find_segment_by_name(&self, name: &String) -> Option<&SegmentEntry> {
     self.segments.find_segment_by_name(name)
   }
+
+  pub fn find_memory_by_name(&self, name: &String) -> Option<&MemoryEntry> {
+    self.memory.find_memory_by_name(name)
+  }
+
+  pub fn get_segment_start(&self, name: &String) -> u16 {
+    let segment = self.find_segment_by_name(name).unwrap();
+    match segment.get_start() {
+      Some(start) => start,
+      None => {
+        let memory_entry = self.find_memory_by_name(segment.get_load()).unwrap();
+        memory_entry.get_start()
+      }
+    }
+  }
 }
 
 struct ConfigBuilder {
@@ -233,6 +248,13 @@ impl Memory {
   fn add_entry(&mut self, entry: MemoryEntry) {
     self.entries.push(entry);
   }
+
+  fn find_memory_by_name(&self, name: &String) -> Option<&MemoryEntry> {
+    self
+      .entries
+      .iter()
+      .find(|e| e.name.to_ascii_uppercase() == name.to_ascii_uppercase())
+  }
 }
 
 struct MemoryEntry {
@@ -260,6 +282,10 @@ impl MemoryEntry {
       fill: None,
       fill_val: None,
     }
+  }
+
+  fn get_start(&self) -> u16 {
+    self.start
   }
 }
 
@@ -405,6 +431,14 @@ impl SegmentEntry {
 
   pub fn get_type(&self) -> &SegType {
     &self.seg_type
+  }
+
+  fn get_load(&self) -> &String {
+    &self.load
+  }
+
+  fn get_start(&self) -> Option<u16> {
+    self.start
   }
 }
 

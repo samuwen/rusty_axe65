@@ -22,7 +22,8 @@ impl<T> Node<T> {
   }
 
   pub fn get_first_data_result(&self) -> &T {
-    &self.data.get(0).expect("No data found in node")
+    let error = format!("No data found in node of type {:?}", self.get_type());
+    &self.data.get(0).expect(&error)
   }
 
   pub fn get_first_child(&self) -> &Node<T> {

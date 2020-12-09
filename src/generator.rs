@@ -2,6 +2,7 @@ use crate::configuration::{generate_config_data, Configuration, SegType};
 use crate::node::{Node, NodeType};
 use crate::opcode::*;
 use std::collections::HashMap;
+use std::fs::metadata;
 
 pub fn generate(tree: Node<String>, config_file: &String) -> Vec<String> {
   let config = generate_config_data(config_file);
@@ -55,50 +56,58 @@ fn get_count(node_type: &NodeType, children: &Vec<Node<String>>) -> usize {
 }
 
 fn create_size_map(tree: &Node<String>, context: &mut Context) {
+  context.reset_label_count();
   for child in tree.get_children() {
     match child.get_type() {
-      NodeType::DirectiveStatement => handle_directive_statement(child, context),
-      NodeType::LabelStatement => handle_label_statement(child, context),
-      NodeType::OpcodeStatement => handle_opcode_statement(child, context),
+      NodeType::DirectiveStatement => add_directive_sizes(child, context),
+      NodeType::LabelStatement => add_label_sizes(child, context),
+      NodeType::OpcodeStatement => add_opcode_sizes(child, context),
       NodeType::AssignmentStatement => (),
       _ => panic!("Invalid statement type {:?}", child.get_type()),
     }
   }
 }
 
-fn populate_data(tree: &Node<String>, context: &mut Context) {
-  todo!();
-}
-
-fn handle_directive_statement(node: &Node<String>, context: &mut Context) {
+fn add_directive_sizes(node: &Node<String>, context: &mut Context) {
   for child in node.get_children() {
     match child.get_type() {
       NodeType::DirectiveSegment => context.switch_segment(child.get_first_data_result()),
-      NodeType::DirectiveByte | NodeType::DirectiveByt => handle_byte_directive(child, context),
+      NodeType::DirectiveByte | NodeType::DirectiveByt => add_byte_sizes(child, context),
+      NodeType::DirectiveIncbin => add_incbin_sizes(child, context),
+      NodeType::DirectiveWord => add_word_sizes(child, context),
+      NodeType::DirectiveRes => add_res_sizes(child, context),
       _ => panic!("Directive not found {:?}", child.get_type()),
     }
   }
 }
 
-fn handle_label_statement(node: &Node<String>, context: &mut Context) {
+fn add_label_sizes(node: &Node<String>, context: &mut Context) {
   for child in node.get_children() {
-    let data = child.get_first_data_result();
-    context.add_size_to_label(data);
+    match child.get_type() {
+      NodeType::UnnamedLabel => {
+        context.add_size_to_unnamed_label();
+      }
+      NodeType::Label | NodeType::LocalLabel => {
+        let data = child.get_first_data_result();
+        context.add_size_to_label(data);
+      }
+      _ => panic!("Invalid label type {:?}", child.get_type()),
+    }
   }
 }
 
-fn handle_opcode_statement(node: &Node<String>, context: &mut Context) {
+fn add_opcode_sizes(node: &Node<String>, context: &mut Context) {
   for child in node.get_children() {
     match child.get_type() {
-      NodeType::AccumulatorMode => handle_accumulator_mode(child, context),
-      NodeType::ImmediateMode => handle_immediate_mode(child, context),
-      NodeType::DirectMode => handle_direct_mode(child, context),
+      NodeType::AccumulatorMode => add_accumulator_sizes(context),
+      NodeType::ImmediateMode => add_immediate_mode_sizes(context),
+      NodeType::DirectMode => add_direct_mode_sizes(child, context),
       _ => (),
     }
   }
 }
 
-fn handle_byte_directive(node: &Node<String>, context: &mut Context) {
+fn add_byte_sizes(node: &Node<String>, context: &mut Context) {
   for child in node.get_children() {
     let dir_args = child.get_children();
     for arg in dir_args {
@@ -121,15 +130,39 @@ fn handle_byte_directive(node: &Node<String>, context: &mut Context) {
   }
 }
 
-fn handle_accumulator_mode(node: &Node<String>, context: &mut Context) {
+fn add_incbin_sizes(node: &Node<String>, context: &mut Context) {
+  let dir_args = node.get_first_child();
+  for arg in dir_args.get_children() {
+    let file_name = arg.get_first_data_result();
+    let path = format!("src/data/{}", file_name);
+    let meta = metadata(path).expect("file not found");
+    context.add_size_to_current_segment(meta.len() as usize);
+  }
+}
+
+fn add_word_sizes(node: &Node<String>, context: &mut Context) {
+  let dir_args = node.get_first_child();
+  for _ in dir_args.get_children() {
+    context.add_size_to_current_segment(2);
+  }
+}
+
+fn add_res_sizes(node: &Node<String>, context: &mut Context) {
+  let dir_args = node.get_first_child();
+  let size = dir_args.get_first_child();
+  let number = usize::from_str_radix(size.get_first_data_result(), 10).unwrap();
+  context.add_size_to_current_segment(number);
+}
+
+fn add_accumulator_sizes(context: &mut Context) {
   context.add_size_to_current_segment(1);
 }
 
-fn handle_immediate_mode(node: &Node<String>, context: &mut Context) {
+fn add_immediate_mode_sizes(context: &mut Context) {
   context.add_size_to_current_segment(2);
 }
 
-fn handle_direct_mode(node: &Node<String>, context: &mut Context) {
+fn add_direct_mode_sizes(node: &Node<String>, context: &mut Context) {
   let operand_node = node.get_first_child();
   match operand_node.get_type() {
     NodeType::Number => {
@@ -144,6 +177,26 @@ fn handle_direct_mode(node: &Node<String>, context: &mut Context) {
       let variable = operand_node.get_first_data_result();
       context.add_size_from_variable(variable);
     }
+    NodeType::LabelJump => {
+      let data = operand_node.get_first_data_result();
+      let is_pos = data.chars().any(|c| c == '+');
+      let f = |op| data.chars().filter(|c| c == &op).count();
+      let count = match is_pos {
+        true => f('+'),
+        false => f('-'),
+      };
+      context.add_size_to_label_jump(is_pos, count);
+    }
+    NodeType::BinaryOp => {
+      // in the case of a label we need to parse through the expression tree
+      // to figure out how big the number is
+      let result = evaluate_binary_op_for_size(operand_node, context);
+      let size = match result > 0xFF {
+        true => 3,
+        false => 2,
+      };
+      context.add_size_to_current_segment(size);
+    }
     _ => panic!(
       "Invalid child for direct mode {:?}",
       operand_node.get_type()
@@ -151,10 +204,140 @@ fn handle_direct_mode(node: &Node<String>, context: &mut Context) {
   }
 }
 
+fn evaluate_binary_op_for_size(node: &Node<String>, context: &mut Context) -> u16 {
+  let left = node.get_first_child();
+  let right = node.get_children().get(1).unwrap();
+  let operator = node.get_first_data_result();
+  let left_num = evaluate_term_for_size(left, context);
+  let right_num = evaluate_term_for_size(right, context);
+  match operator.as_str() {
+    "+" => left_num + right_num,
+    "-" => left_num - right_num,
+    "/" => left_num / right_num,
+    "*" => left_num * right_num,
+    "|" => left_num | right_num,
+    "&" => left_num & right_num,
+    "<<" => left_num << right_num,
+    ">>" => left_num >> right_num,
+    _ => panic!("unsupported operator {}", operator),
+  }
+}
+
+fn evaluate_term_for_size(node: &Node<String>, context: &mut Context) -> u16 {
+  let name = node.get_first_data_result();
+  match node.get_type() {
+    NodeType::Number => u16::from_str_radix(name, 10).unwrap(),
+    NodeType::BinaryOp => evaluate_binary_op_for_size(node, context),
+    NodeType::Variable => {
+      let var_opt = context.get_var(name);
+      match var_opt {
+        Some(num) => *num,
+        // if we're not in zero page add 0x100 to determine byte size
+        None => match context.is_label_in_zero_page(name) {
+          true => 0,
+          false => 0x100,
+        },
+      }
+    }
+    _ => panic!("unknown term: {:?}", node.get_type()),
+  }
+}
+
 fn get_bytes_from_number_node(node: &Node<String>) -> [u8; 2] {
   let data = node.get_first_data_result();
   let full = u16::from_str_radix(data, 10).unwrap();
   full.to_le_bytes()
+}
+
+fn populate_data(tree: &Node<String>, context: &mut Context) {
+  context.reset_label_count();
+  for child in tree.get_children() {
+    match child.get_type() {
+      NodeType::DirectiveStatement => populate_directive_data(child, context),
+      _ => panic!("Invalid statement type {:?}", child.get_type()),
+    }
+  }
+}
+
+fn populate_directive_data(node: &Node<String>, context: &mut Context) {
+  for child in node.get_children() {
+    match child.get_type() {
+      NodeType::DirectiveSegment => context.switch_segment(child.get_first_data_result()),
+      NodeType::DirectiveByte | NodeType::DirectiveByt => populate_bytes(child, context),
+      NodeType::DirectiveIncbin => populate_incbin(child, context),
+      NodeType::DirectiveWord => populate_words(child, context),
+      NodeType::DirectiveRes => (),
+      _ => panic!("Unimplemented type {:?}", child.get_type()),
+    }
+  }
+}
+
+fn populate_bytes(node: &Node<String>, context: &mut Context) {
+  for child in node.get_children() {
+    for arg in child.get_children() {
+      match arg.get_type() {
+        NodeType::String => {
+          let data = arg.get_first_data_result();
+          data
+            .chars()
+            .for_each(|c| context.add_value_to_current_segment(c as u8));
+        }
+        NodeType::Number => {
+          let num = arg.get_first_data_result();
+          let num = u8::from_str_radix(num, 10).unwrap();
+          context.add_value_to_current_segment(num);
+        }
+        NodeType::BinaryOp => {
+          // assuming that a sequence of operations will result in a single byte of data
+          context.add_size_to_current_segment(1);
+        }
+        _ => panic!("nyi"),
+      }
+    }
+  }
+}
+
+fn populate_incbin(node: &Node<String>, context: &mut Context) {
+  todo!();
+}
+
+fn populate_words(node: &Node<String>, context: &mut Context) {
+  todo!();
+}
+
+fn evaluate_binary_expression(node: &Node<String>, context: &mut Context) -> u16 {
+  let left = node.get_first_child();
+  let right = node.get_children().get(1).unwrap();
+  let operator = node.get_first_data_result();
+  let left_num = evaluate_term(left, context);
+  let right_num = evaluate_term(right, context);
+  match operator.as_str() {
+    "+" => left_num + right_num,
+    "-" => left_num - right_num,
+    "/" => left_num / right_num,
+    "*" => left_num * right_num,
+    "|" => left_num | right_num,
+    "&" => left_num & right_num,
+    "<<" => left_num << right_num,
+    ">>" => left_num >> right_num,
+    _ => panic!("unsupported operator {}", operator),
+  }
+}
+
+fn evaluate_term(node: &Node<String>, context: &mut Context) -> u16 {
+  let name = node.get_first_data_result();
+  match node.get_type() {
+    NodeType::Number => u16::from_str_radix(name, 10).unwrap(),
+    NodeType::BinaryOp => evaluate_binary_op_for_size(node, context),
+    NodeType::Variable => {
+      let var_opt = context.get_var(name);
+      match var_opt {
+        Some(num) => *num,
+        None => context.get_label_address(name),
+      }
+    }
+    _ => panic!("unknown term: {:?}", node.get_type()),
+  }
 }
 
 struct Context {
@@ -249,9 +432,18 @@ impl Context {
     self.label_map.insert(k.to_owned(), label);
   }
 
-  fn add_unnamed_label_to_map(&mut self) {
-    let name = format!("label-{}", self.unnamed_label_counter);
+  fn get_formatted_name(&mut self, count: u16) -> String {
+    format!("label-{}", count)
+  }
+
+  fn get_unnamed_label_now(&mut self) -> String {
+    let name = self.get_formatted_name(self.unnamed_label_counter);
     self.unnamed_label_counter += 1;
+    name
+  }
+
+  fn add_unnamed_label_to_map(&mut self) {
+    let name = self.get_unnamed_label_now();
     self.add_label_to_map(&name);
   }
 
@@ -278,6 +470,12 @@ impl Context {
     }
   }
 
+  fn is_label_in_zero_page(&self, label_name: &String) -> bool {
+    let label = self.label_map.get(label_name).unwrap();
+    let segment = self.get_segment_by_id(label.get_segment()).unwrap();
+    segment.get_mode() == &AddressMode::ZeroPage
+  }
+
   fn get_current_segment(&mut self) -> &mut Segment {
     let index = self
       .segment_list
@@ -302,6 +500,13 @@ impl Context {
     label.add_offset(offset);
   }
 
+  fn add_size_to_unnamed_label(&mut self) {
+    let offset = self.get_current_segment_size();
+    let name = self.get_unnamed_label_now();
+    let label = self.label_map.get_mut(&name).unwrap();
+    label.add_offset(offset);
+  }
+
   fn add_size_to_current_segment(&mut self, byte: usize) {
     let seg = self.get_current_segment();
     seg.add_size(byte as u16);
@@ -309,6 +514,27 @@ impl Context {
 
   fn get_segment_by_id(&self, id: u8) -> Option<&Segment> {
     self.segment_list.iter().find(|s| s.id == id)
+  }
+
+  fn reset_label_count(&mut self) {
+    self.unnamed_label_counter = 0;
+  }
+
+  fn add_size_to_label_jump(&mut self, is_pos: bool, count: usize) {
+    let count = count as u16;
+    let num = match is_pos {
+      true => self.unnamed_label_counter + count - 1,
+      false => self.unnamed_label_counter - count,
+    };
+    let name = self.get_formatted_name(num);
+    self.add_size_from_variable(&name);
+  }
+
+  fn get_label_address(&self, name: &String) -> u16 {
+    let label = self.label_map.get(name).unwrap();
+    let segment = self.get_segment_by_id(label.get_segment()).unwrap();
+    let start = self.config.get_segment_start(segment.get_name());
+    start + label.get_offset()
   }
 }
 
@@ -377,6 +603,10 @@ impl Segment {
   fn get_mode(&self) -> &AddressMode {
     &self.address_mode
   }
+
+  fn get_name(&self) -> &String {
+    &self.name
+  }
 }
 
 impl Eq for Segment {}
@@ -407,6 +637,7 @@ impl Storage {
   }
 }
 
+#[derive(Eq, PartialEq)]
 enum AddressMode {
   ZeroPage,
   Absolute,
