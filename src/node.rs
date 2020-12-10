@@ -26,6 +26,10 @@ impl<T> Node<T> {
     &self.data.get(0).expect(&error)
   }
 
+  pub fn get_data(&self) -> &Vec<T> {
+    &self.data
+  }
+
   pub fn get_first_child(&self) -> &Node<T> {
     &self.children.get(0).expect("No children found in node")
   }
@@ -88,6 +92,7 @@ pub enum NodeType {
   DirectRegYMode,
   IndirectXMode,
   IndirectYMode,
+  RelativeMode,
   BinaryOp,
   UnaryOp,
   LabelJump,

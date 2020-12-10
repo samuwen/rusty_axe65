@@ -161,7 +161,7 @@ fn parse_unnamed_label(tokens: &mut Vec<Token>) -> Node<String> {
   unnamed
 }
 
-// <opcode> ::= <accumulator-mode> | <immediate-mode> | <direct-memory-mode> | <indirect-memory-mode>
+// <opcode> ::= <accumulator-mode> | <immediate-mode> | <direct-memory-mode> | <indirect-memory-mode> | <relative-mode>
 fn parse_opcode(tokens: &mut Vec<Token>) -> Node<String> {
   let mut op_node = Node::new(NodeType::OpcodeStatement);
   let next = peek_next_token(tokens);
@@ -174,6 +174,7 @@ fn parse_opcode(tokens: &mut Vec<Token>) -> Node<String> {
       let child_op_node = match after_next.get_type() {
         TokenType::Hash => parse_immediate(tokens),
         TokenType::OParen => parse_indirect(tokens),
+        TokenType::ULabel => parse_ulabel(tokens),
         _ => parse_direct(tokens),
       };
       op_node.add_child(child_op_node);
@@ -313,7 +314,6 @@ fn parse_factor(tokens: &mut Vec<Token>) -> Node<String> {
     }
     TokenType::Identifier | TokenType::LocalLabel => parse_variable(tokens),
     TokenType::BinNumber | TokenType::HexNumber | TokenType::DecNumber => parse_number(tokens),
-    TokenType::ULabel => parse_ulabel(tokens),
     _ => error(&token),
   }
 }
@@ -326,10 +326,14 @@ fn parse_variable(tokens: &mut Vec<Token>) -> Node<String> {
 }
 
 fn parse_ulabel(tokens: &mut Vec<Token>) -> Node<String> {
+  let opcode = get_next_token_checked(tokens, vec![TokenType::Opcode]);
   let token = get_next_token(tokens);
+  let mut mode_node = Node::new(NodeType::RelativeMode);
+  mode_node.add_data(opcode.get_value());
   let mut node = Node::new(NodeType::LabelJump);
   node.add_data(token.get_value());
-  node
+  mode_node.add_child(node);
+  mode_node
 }
 
 // Take hex/bin/dec number and return it without control chars as decimal number

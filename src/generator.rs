@@ -2,7 +2,7 @@ use crate::configuration::{generate_config_data, Configuration, SegType};
 use crate::node::{Node, NodeType};
 use crate::opcode::*;
 use std::collections::HashMap;
-use std::fs::metadata;
+use std::fs::{metadata, read};
 
 pub fn generate(tree: Node<String>, config_file: &String) -> Vec<String> {
   let config = generate_config_data(config_file);
@@ -253,7 +253,15 @@ fn populate_data(tree: &Node<String>, context: &mut Context) {
   context.reset_label_count();
   for child in tree.get_children() {
     match child.get_type() {
+      NodeType::AssignmentStatement => (),
       NodeType::DirectiveStatement => populate_directive_data(child, context),
+      NodeType::LabelStatement => {
+        let label_type_node = child.get_first_child();
+        if label_type_node.get_type() == &NodeType::UnnamedLabel {
+          context.advance_unnamed_label_counter();
+        }
+      }
+      NodeType::OpcodeStatement => populate_opcode_data(child, context),
       _ => panic!("Invalid statement type {:?}", child.get_type()),
     }
   }
@@ -288,8 +296,17 @@ fn populate_bytes(node: &Node<String>, context: &mut Context) {
           context.add_value_to_current_segment(num);
         }
         NodeType::BinaryOp => {
-          // assuming that a sequence of operations will result in a single byte of data
-          context.add_size_to_current_segment(1);
+          let num = evaluate_binary_expression(arg, context);
+          match num > 0xFF {
+            true => {
+              let bytes = num.to_le_bytes();
+              context.add_value_to_current_segment(bytes[0]);
+              context.add_value_to_current_segment(bytes[1]);
+            }
+            false => {
+              context.add_value_to_current_segment(num as u8);
+            }
+          }
         }
         _ => panic!("nyi"),
       }
@@ -298,11 +315,153 @@ fn populate_bytes(node: &Node<String>, context: &mut Context) {
 }
 
 fn populate_incbin(node: &Node<String>, context: &mut Context) {
-  todo!();
+  for child in node.get_children() {
+    for arg in child.get_children() {
+      for file_name in arg.get_data() {
+        let path = format!("src/data/{}", file_name);
+        let error = format!("File not found {}", file_name);
+        let bytes = read(path).expect(&error);
+        for byte in bytes.iter() {
+          context.add_value_to_current_segment(*byte);
+        }
+      }
+    }
+  }
 }
 
 fn populate_words(node: &Node<String>, context: &mut Context) {
-  todo!();
+  for child in node.get_children() {
+    for arg in child.get_children() {
+      match arg.get_type() {
+        NodeType::Variable => {
+          let name = arg.get_first_data_result();
+          let var_opt = context.get_var(name);
+          let value = match var_opt {
+            Some(num) => *num,
+            None => context.get_label_address(name),
+          };
+          let bytes = value.to_le_bytes();
+          context.add_value_to_current_segment(bytes[0]);
+          context.add_value_to_current_segment(bytes[1]);
+        }
+        _ => panic!("Not yet implemented: {:?}", arg.get_type()),
+      }
+    }
+  }
+}
+
+fn populate_opcode_data(node: &Node<String>, context: &mut Context) {
+  for child in node.get_children() {
+    match child.get_type() {
+      NodeType::AccumulatorMode => populate_accumulator_mode(child, context),
+      NodeType::ImmediateMode => populate_immediate_mode(child, context),
+      NodeType::DirectMode => populate_direct_mode(child, context),
+      NodeType::RelativeMode => populate_relative_mode(child, context),
+      _ => panic!("Not yet implemented: {:?}", child.get_type()),
+    }
+  }
+}
+
+fn populate_accumulator_mode(node: &Node<String>, context: &mut Context) {
+  let opcode = node.get_first_data_result();
+  let num = get_accumulator(opcode);
+  context.add_value_to_current_segment(num);
+}
+
+fn populate_immediate_mode(node: &Node<String>, context: &mut Context) {
+  let opcode = node.get_first_data_result();
+  let num = get_immediate(opcode);
+  context.add_value_to_current_segment(num);
+  let operand_node = node.get_first_child();
+  let operand_data = match operand_node.get_type() {
+    NodeType::Number => {
+      let data = operand_node.get_first_data_result();
+      u8::from_str_radix(data, 10).unwrap()
+    }
+    NodeType::Variable => {
+      let data = operand_node.get_first_data_result();
+      let var_num = match context.get_var(data) {
+        Some(val) => *val,
+        None => context.get_label_address(data),
+      };
+      match var_num > 0xFF {
+        false => var_num as u8,
+        true => panic!("Immediate mode number has more than one byte"),
+      }
+    }
+    // a unary op in this case is almost certainly hibyte or lobyte
+    NodeType::UnaryOp => {
+      let op = operand_node.get_first_data_result();
+      let child = operand_node.get_first_child();
+      let data = match child.get_type() {
+        NodeType::Variable => context.get_label_address(child.get_first_data_result()),
+        _ => panic!("Unknown child type: {:?}", child.get_type()),
+      };
+      let bytes = data.to_le_bytes();
+      match op.as_str() {
+        "<" => bytes[0],
+        ">" => bytes[1],
+        _ => panic!("Unknown operator for immediate unary: {:?}", op),
+      }
+    }
+    _ => panic!("honk"),
+  };
+  context.add_value_to_current_segment(operand_data);
+}
+
+fn populate_direct_mode(node: &Node<String>, context: &mut Context) {
+  let opcode = node.get_first_data_result();
+  let op_node = node.get_first_child();
+  let num = match op_node.get_type() {
+    NodeType::Number => {
+      let data = op_node.get_first_data_result();
+      u16::from_str_radix(data, 10).unwrap()
+    }
+    NodeType::Variable => {
+      let name = op_node.get_first_data_result();
+      let var_opt = context.get_var(name);
+      match var_opt {
+        Some(num) => *num,
+        None => context.get_label_address(name),
+      }
+    }
+    _ => panic!("Invalid node child {:?}", op_node.get_type()),
+  };
+  let bytes = num.to_le_bytes();
+  match num > 0xFF {
+    true => {
+      let opcode_byte = get_absolute(opcode);
+      context.add_value_to_current_segment(opcode_byte);
+      context.add_value_to_current_segment(bytes[0]);
+      context.add_value_to_current_segment(bytes[1]);
+    }
+    false => {
+      let opcode_byte = get_zero_page(opcode);
+      context.add_value_to_current_segment(opcode_byte);
+      context.add_value_to_current_segment(bytes[0]);
+    }
+  }
+}
+
+fn populate_relative_mode(node: &Node<String>, context: &mut Context) {
+  let opcode = node.get_first_data_result();
+  let op_node = node.get_first_child();
+  match op_node.get_type() {
+    NodeType::LabelJump => {
+      let data = op_node.get_first_data_result();
+      let is_pos = data.chars().any(|c| c == '+');
+      let f = |op| data.chars().filter(|c| c == &op).count();
+      let count = match is_pos {
+        true => f('+'),
+        false => f('-'),
+      };
+      let address = context.get_address_for_label_jump(is_pos, count);
+      let opcode_byte = get_relative(opcode);
+      context.add_value_to_current_segment(opcode_byte);
+      context.add_value_to_current_segment(address);
+    }
+    _ => panic!("stuff"),
+  }
 }
 
 fn evaluate_binary_expression(node: &Node<String>, context: &mut Context) -> u16 {
@@ -436,6 +595,10 @@ impl Context {
     format!("label-{}", count)
   }
 
+  fn advance_unnamed_label_counter(&mut self) {
+    self.unnamed_label_counter += 1;
+  }
+
   fn get_unnamed_label_now(&mut self) -> String {
     let name = self.get_formatted_name(self.unnamed_label_counter);
     self.unnamed_label_counter += 1;
@@ -492,6 +655,24 @@ impl Context {
   fn add_value_to_current_segment(&mut self, byte: u8) {
     let seg = self.get_current_segment();
     seg.add_value(byte);
+  }
+
+  fn get_address_for_label_jump(&mut self, is_pos: bool, count: usize) -> u8 {
+    let count = count as u16;
+    let num = match is_pos {
+      true => self.unnamed_label_counter + count - 1,
+      false => self.unnamed_label_counter - count,
+    };
+    let offset = self.get_current_segment_size();
+    let target_name = self.get_formatted_name(num);
+    let target_label = self.label_map.get(&target_name).unwrap();
+    match is_pos {
+      true => (target_label.get_offset() - offset) as u8,
+      false => {
+        let diff = offset - target_label.get_offset();
+        (!diff + 1) as u8
+      }
+    }
   }
 
   fn add_size_to_label(&mut self, label_name: &String) {

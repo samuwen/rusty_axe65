@@ -194,7 +194,7 @@ pub fn _get_zero_page_y(code: &str) -> u8 {
   }
 }
 
-pub fn _get_relative(code: &str) -> u8 {
+pub fn get_relative(code: &str) -> u8 {
   match code.to_ascii_lowercase().as_str() {
     "bcc" => 0x90,
     "bcs" => 0xB0,
