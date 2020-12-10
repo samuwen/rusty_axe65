@@ -355,7 +355,9 @@ fn populate_opcode_data(node: &Node<String>, context: &mut Context) {
     match child.get_type() {
       NodeType::AccumulatorMode => populate_accumulator_mode(child, context),
       NodeType::ImmediateMode => populate_immediate_mode(child, context),
-      NodeType::DirectMode => populate_direct_mode(child, context),
+      NodeType::DirectMode | NodeType::DirectRegXMode | NodeType::DirectRegYMode => {
+        populate_direct_mode(child, context)
+      }
       NodeType::RelativeMode => populate_relative_mode(child, context),
       _ => panic!("Not yet implemented: {:?}", child.get_type()),
     }
@@ -374,20 +376,13 @@ fn populate_immediate_mode(node: &Node<String>, context: &mut Context) {
   context.add_value_to_current_segment(num);
   let operand_node = node.get_first_child();
   let operand_data = match operand_node.get_type() {
-    NodeType::Number => {
-      let data = operand_node.get_first_data_result();
-      u8::from_str_radix(data, 10).unwrap()
-    }
+    NodeType::Number => to_u8_checked(get_real_number_value(operand_node)),
     NodeType::Variable => {
       let data = operand_node.get_first_data_result();
-      let var_num = match context.get_var(data) {
+      to_u8_checked(match context.get_var(data) {
         Some(val) => *val,
         None => context.get_label_address(data),
-      };
-      match var_num > 0xFF {
-        false => var_num as u8,
-        true => panic!("Immediate mode number has more than one byte"),
-      }
+      })
     }
     // a unary op in this case is almost certainly hibyte or lobyte
     NodeType::UnaryOp => {
@@ -413,10 +408,7 @@ fn populate_direct_mode(node: &Node<String>, context: &mut Context) {
   let opcode = node.get_first_data_result();
   let op_node = node.get_first_child();
   let num = match op_node.get_type() {
-    NodeType::Number => {
-      let data = op_node.get_first_data_result();
-      u16::from_str_radix(data, 10).unwrap()
-    }
+    NodeType::Number => get_real_number_value(op_node),
     NodeType::Variable => {
       let name = op_node.get_first_data_result();
       let var_opt = context.get_var(name);
@@ -430,13 +422,23 @@ fn populate_direct_mode(node: &Node<String>, context: &mut Context) {
   let bytes = num.to_le_bytes();
   match num > 0xFF {
     true => {
-      let opcode_byte = get_absolute(opcode);
+      let opcode_byte = match node.get_type() {
+        NodeType::DirectRegXMode => get_absolute_x(opcode),
+        NodeType::DirectRegYMode => get_absolute_y(opcode),
+        NodeType::DirectMode => get_absolute(opcode),
+        _ => panic!("Invalid node type {:?}", node.get_type()),
+      };
       context.add_value_to_current_segment(opcode_byte);
       context.add_value_to_current_segment(bytes[0]);
       context.add_value_to_current_segment(bytes[1]);
     }
     false => {
-      let opcode_byte = get_zero_page(opcode);
+      let opcode_byte = match node.get_type() {
+        NodeType::DirectRegXMode => get_zero_page_x(opcode),
+        NodeType::DirectRegYMode => get_zero_page_y(opcode),
+        NodeType::DirectMode => get_zero_page(opcode),
+        _ => panic!("Invalid node type {:?}", node.get_type()),
+      };
       context.add_value_to_current_segment(opcode_byte);
       context.add_value_to_current_segment(bytes[0]);
     }
@@ -496,6 +498,18 @@ fn evaluate_term(node: &Node<String>, context: &mut Context) -> u16 {
       }
     }
     _ => panic!("unknown term: {:?}", node.get_type()),
+  }
+}
+
+fn get_real_number_value(node: &Node<String>) -> u16 {
+  let num = node.get_first_data_result();
+  u16::from_str_radix(num, 10).unwrap()
+}
+
+fn to_u8_checked(num: u16) -> u8 {
+  match num > 0xFF {
+    false => num as u8,
+    true => panic!("Number '{}' is greater than a single byte", num),
   }
 }
 
@@ -663,7 +677,7 @@ impl Context {
       true => self.unnamed_label_counter + count - 1,
       false => self.unnamed_label_counter - count,
     };
-    let offset = self.get_current_segment_size();
+    let offset = self.get_current_segment().get_value_len();
     let target_name = self.get_formatted_name(num);
     let target_label = self.label_map.get(&target_name).unwrap();
     match is_pos {
@@ -771,6 +785,10 @@ impl Segment {
 
   fn add_label(&mut self, label: Label) {
     self.values.push(Storage::new_label(label));
+  }
+
+  fn get_value_len(&self) -> u16 {
+    self.values.len() as u16
   }
 
   fn add_size(&mut self, size: u16) {

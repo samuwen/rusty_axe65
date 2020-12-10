@@ -101,7 +101,7 @@ pub fn get_absolute(code: &str) -> u8 {
   }
 }
 
-pub fn _get_absolute_x(code: &str) -> u8 {
+pub fn get_absolute_x(code: &str) -> u8 {
   match code.to_ascii_lowercase().as_str() {
     "adc" => 0x7D,
     "and" => 0x3D,
@@ -123,7 +123,7 @@ pub fn _get_absolute_x(code: &str) -> u8 {
   }
 }
 
-pub fn _get_absolute_y(code: &str) -> u8 {
+pub fn get_absolute_y(code: &str) -> u8 {
   match code.to_ascii_lowercase().as_str() {
     "adc" => 0x79,
     "and" => 0x39,
@@ -164,7 +164,7 @@ pub fn get_zero_page(code: &str) -> u8 {
   }
 }
 
-pub fn _get_zero_page_x(code: &str) -> u8 {
+pub fn get_zero_page_x(code: &str) -> u8 {
   match code.to_ascii_lowercase().as_str() {
     "adc" => 0x75,
     "and" => 0x35,
@@ -186,7 +186,7 @@ pub fn _get_zero_page_x(code: &str) -> u8 {
   }
 }
 
-pub fn _get_zero_page_y(code: &str) -> u8 {
+pub fn get_zero_page_y(code: &str) -> u8 {
   match code.to_ascii_lowercase().as_str() {
     "ldx" => 0xB6,
     "stx" => 0x96,
