@@ -175,7 +175,10 @@ fn parse_opcode(tokens: &mut Vec<Token>) -> Node<String> {
         TokenType::Hash => parse_immediate(tokens),
         TokenType::OParen => parse_indirect(tokens),
         TokenType::ULabel => parse_ulabel(tokens),
-        _ => parse_direct(tokens),
+        _ => match is_branch(next.get_value()) {
+          true => parse_branch(tokens),
+          false => parse_direct(tokens),
+        },
       };
       op_node.add_child(child_op_node);
     }
@@ -222,6 +225,15 @@ fn parse_direct(tokens: &mut Vec<Token>) -> Node<String> {
   dir_node.add_data(code.get_value());
   dir_node.add_child(expression);
   dir_node
+}
+
+fn parse_branch(tokens: &mut Vec<Token>) -> Node<String> {
+  let code = get_next_token_checked(tokens, vec![TokenType::Opcode]);
+  let mut node = Node::new(NodeType::RelativeMode);
+  node.add_data(code.get_value());
+  let expression = parse_expression(tokens);
+  node.add_child(expression);
+  node
 }
 
 // <indirect-memory-mode> ::= <indirect-x> | <indirect-y>

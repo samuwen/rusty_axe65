@@ -1,6 +1,7 @@
 use crate::configuration::{generate_config_data, Configuration, SegType};
 use crate::node::{Node, NodeType};
 use crate::opcode::*;
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fs::{metadata, read};
 
@@ -101,7 +102,10 @@ fn add_opcode_sizes(node: &Node<String>, context: &mut Context) {
     match child.get_type() {
       NodeType::AccumulatorMode => add_accumulator_sizes(context),
       NodeType::ImmediateMode => add_immediate_mode_sizes(context),
-      NodeType::DirectMode => add_direct_mode_sizes(child, context),
+      NodeType::DirectMode | NodeType::DirectRegXMode | NodeType::DirectRegYMode => {
+        add_direct_mode_sizes(child, context)
+      }
+      NodeType::RelativeMode => add_relative_mode_sizes(context),
       _ => (),
     }
   }
@@ -202,6 +206,10 @@ fn add_direct_mode_sizes(node: &Node<String>, context: &mut Context) {
       operand_node.get_type()
     ),
   }
+}
+
+fn add_relative_mode_sizes(context: &mut Context) {
+  context.add_size_to_current_segment(2);
 }
 
 fn evaluate_binary_op_for_size(node: &Node<String>, context: &mut Context) -> u16 {
@@ -399,7 +407,14 @@ fn populate_immediate_mode(node: &Node<String>, context: &mut Context) {
         _ => panic!("Unknown operator for immediate unary: {:?}", op),
       }
     }
-    _ => panic!("honk"),
+    NodeType::BinaryOp => {
+      let num = evaluate_binary_expression(operand_node, context);
+      if num > 0xFF {
+        panic!("Immediate mode binary op is more than one byte");
+      }
+      num as u8
+    }
+    _ => panic!("Invalid node type {:?}", operand_node.get_type()),
   };
   context.add_value_to_current_segment(operand_data);
 }
@@ -417,6 +432,7 @@ fn populate_direct_mode(node: &Node<String>, context: &mut Context) {
         None => context.get_label_address(name),
       }
     }
+    NodeType::BinaryOp => evaluate_binary_expression(op_node, context),
     _ => panic!("Invalid node child {:?}", op_node.get_type()),
   };
   let bytes = num.to_le_bytes();
@@ -457,12 +473,30 @@ fn populate_relative_mode(node: &Node<String>, context: &mut Context) {
         true => f('+'),
         false => f('-'),
       };
-      let address = context.get_address_for_label_jump(is_pos, count);
       let opcode_byte = get_relative(opcode);
       context.add_value_to_current_segment(opcode_byte);
+      let address = context.get_address_for_label_jump(is_pos, count);
       context.add_value_to_current_segment(address);
     }
-    _ => panic!("stuff"),
+    NodeType::Variable => {
+      let name = op_node.get_first_data_result();
+      let var_opt = context.get_var(name);
+      let target_address = match var_opt {
+        Some(num) => *num,
+        None => context.get_label(name).unwrap().get_offset(),
+      };
+      let cur_address = context.get_current_segment().get_value_len();
+      let ordering = target_address.cmp(&cur_address);
+      let address = match ordering {
+        Ordering::Less => !(cur_address - target_address) + 1,
+        Ordering::Greater => target_address - cur_address,
+        _ => cur_address,
+      };
+      let opcode_byte = get_relative(opcode);
+      context.add_value_to_current_segment(opcode_byte);
+      context.add_value_to_current_segment(address as u8);
+    }
+    _ => panic!("Unimplemented node type {:?}", op_node.get_type()),
   }
 }
 

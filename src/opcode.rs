@@ -10,12 +10,18 @@ pub fn is_opcode(t: &str) -> bool {
   }
 }
 
-// Also includes accumulator
 pub fn is_accumulator(code: &str) -> bool {
   match code.to_ascii_lowercase().as_str() {
     "asl" | "brk" | "clc" | "cld" | "cli" | "clv" | "dex" | "dey" | "inx" | "iny" | "lsr"
     | "pha" | "pla" | "php" | "plp" | "nop" | "rol" | "ror" | "rti" | "rts" | "sec" | "sed"
     | "sei" | "tax" | "tay" | "tsx" | "txa" | "txs" | "tya" => true,
+    _ => false,
+  }
+}
+
+pub fn is_branch(code: &str) -> bool {
+  match code.to_ascii_lowercase().as_str() {
+    "bcc" | "bcs" | "beq" | "bmi" | "bne" | "bpl" | "bvc" | "bvs" => true,
     _ => false,
   }
 }
