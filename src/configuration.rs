@@ -196,6 +196,10 @@ impl Configuration {
       }
     }
   }
+
+  pub fn get_segments(&self) -> &Segment {
+    &self.segments
+  }
 }
 
 struct ConfigBuilder {
@@ -257,7 +261,7 @@ impl Memory {
   }
 }
 
-struct MemoryEntry {
+pub struct MemoryEntry {
   name: String,
   start: u16,
   size: u16,
@@ -284,8 +288,12 @@ impl MemoryEntry {
     }
   }
 
-  fn get_start(&self) -> u16 {
+  pub fn get_start(&self) -> u16 {
     self.start
+  }
+
+  pub fn get_size(&self) -> u16 {
+    self.size
   }
 }
 
@@ -375,7 +383,7 @@ impl MemType {
   }
 }
 
-struct Segment {
+pub struct Segment {
   entries: Vec<SegmentEntry>,
 }
 
@@ -395,6 +403,10 @@ impl Segment {
       .entries
       .iter()
       .find(|e| e.name.to_ascii_uppercase() == name.to_ascii_uppercase())
+  }
+
+  pub fn get_entries(&self) -> &Vec<SegmentEntry> {
+    &self.entries
   }
 }
 
@@ -429,11 +441,15 @@ impl SegmentEntry {
     }
   }
 
+  pub fn get_name(&self) -> &String {
+    &self.name
+  }
+
   pub fn get_type(&self) -> &SegType {
     &self.seg_type
   }
 
-  fn get_load(&self) -> &String {
+  pub fn get_load(&self) -> &String {
     &self.load
   }
 

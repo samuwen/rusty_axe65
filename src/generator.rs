@@ -5,13 +5,36 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fs::{metadata, read};
 
-pub fn generate(tree: Node<String>, config_file: &String) -> Vec<String> {
+pub fn generate(tree: Node<String>, config_file: &String) -> [u8; 0xFFFF] {
   let config = generate_config_data(config_file);
   let mut context = Context::new(&tree, config);
   create_symbols(&tree, &mut context);
   create_size_map(&tree, &mut context);
   populate_data(&tree, &mut context);
-  vec![]
+  let mut out = [0; 0xFFFF];
+  for entry in context.get_config().get_segments().get_entries() {
+    let memory = context
+      .get_config()
+      .find_memory_by_name(entry.get_load())
+      .unwrap();
+    let segment = context
+      .get_segment_list()
+      .iter()
+      .find(|s| s.get_name().to_ascii_uppercase() == entry.get_name().to_ascii_uppercase())
+      .unwrap();
+    let start = memory.get_start();
+    let size = memory.get_size() as usize;
+    for (i, value) in segment.get_values().iter().enumerate() {
+      if i > size {
+        panic!("Too many values in segment: {:?}", segment.get_name());
+      }
+      let address = i + start as usize;
+      if *value != 0 {
+        out[address] = *value;
+      }
+    }
+  }
+  out
 }
 
 fn create_symbols(tree: &Node<String>, context: &mut Context) {
@@ -572,6 +595,14 @@ impl Context {
     }
   }
 
+  fn get_segment_list(&self) -> &Vec<Segment> {
+    &self.segment_list
+  }
+
+  fn get_config(&self) -> &Configuration {
+    &self.config
+  }
+
   fn add_var_to_map(&mut self, k: &String, v: u16) {
     self.var_map.insert(k.to_owned(), v);
   }
@@ -582,28 +613,6 @@ impl Context {
 
   fn get_label(&mut self, k: &String) -> Option<&mut Label> {
     self.label_map.get_mut(k)
-  }
-
-  fn handle_variable(&mut self, k: &String) {
-    let var_opt = self.get_var(k);
-    match var_opt {
-      Some(num) => {
-        let bytes = num.to_le_bytes();
-        match num > &0xFF {
-          true => {
-            self.add_value_to_current_segment(bytes[0]);
-            self.add_value_to_current_segment(bytes[1]);
-          }
-          false => {
-            self.add_value_to_current_segment(bytes[0]);
-          }
-        }
-      }
-      None => {
-        let label = self.get_label(k).unwrap().clone();
-        self.get_current_segment().add_label(label.clone());
-      }
-    }
   }
 
   fn add_size_from_variable(&mut self, k: &String) {
@@ -797,7 +806,7 @@ impl Label {
 struct Segment {
   id: u8,
   name: String,
-  values: Vec<Storage>,
+  values: Vec<u8>,
   size: u16,
   address_mode: AddressMode,
 }
@@ -814,11 +823,7 @@ impl Segment {
   }
 
   fn add_value(&mut self, byte: u8) {
-    self.values.push(Storage::new_value(byte));
-  }
-
-  fn add_label(&mut self, label: Label) {
-    self.values.push(Storage::new_label(label));
+    self.values.push(byte);
   }
 
   fn get_value_len(&self) -> u16 {
@@ -840,33 +845,16 @@ impl Segment {
   fn get_name(&self) -> &String {
     &self.name
   }
+
+  fn get_values(&self) -> &Vec<u8> {
+    &self.values
+  }
 }
 
 impl Eq for Segment {}
 impl PartialEq for Segment {
   fn eq(&self, other: &Self) -> bool {
     self.name == other.name
-  }
-}
-
-struct Storage {
-  value: Option<u8>,
-  label: Option<Label>,
-}
-
-impl Storage {
-  fn new_value(value: u8) -> Storage {
-    Storage {
-      value: Some(value),
-      label: None,
-    }
-  }
-
-  fn new_label(label: Label) -> Storage {
-    Storage {
-      value: None,
-      label: Some(label),
-    }
   }
 }
 

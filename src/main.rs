@@ -60,7 +60,7 @@ fn generate_file(tree: Node<String>, config_file: &String) {
     let generated = generate(tree, &config_file);
     let generate_end = Instant::now();
     log_time("Generation", generate_end - generate_start);
-    write("src/out/generated.out", generated.join("\n")).unwrap();
+    write("src/out/generated.out", generated).unwrap();
 }
 
 fn log_time(name: &str, dur: Duration) {
